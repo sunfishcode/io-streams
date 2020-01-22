@@ -17,7 +17,7 @@ use std::{
     io::{self, IoSlice, IoSliceMut, Read, Write},
     net::TcpStream,
 };
-use system_interface::io::Peek;
+use system_interface::io::{Peek, ReadReady};
 #[cfg(not(windows))]
 use unsafe_io::AsRawReadWriteFd;
 #[cfg(windows)]
@@ -195,9 +195,8 @@ impl StreamReader {
     pub fn read_from_command(mut command: Command) -> io::Result<Self> {
         command.stdin(Stdio::null());
         command.stdout(Stdio::piped());
-        let mut child = command.spawn()?;
-        let child_stdout = child.stdout.take().unwrap();
-        let handle = child_stdout.as_unsafe_handle();
+        let child = command.spawn()?;
+        let handle = child.stdout.as_ref().unwrap().as_unsafe_handle();
         Ok(Self::handle(handle, ReadResources::Child(child)))
     }
 
@@ -337,9 +336,8 @@ impl StreamWriter {
     pub fn write_to_command(mut command: Command) -> io::Result<Self> {
         command.stdin(Stdio::piped());
         command.stdout(Stdio::null());
-        let mut child = command.spawn()?;
-        let child_stdin = child.stdin.take().unwrap();
-        let handle = child_stdin.as_unsafe_handle();
+        let child = command.spawn()?;
+        let handle = child.stdin.as_ref().unwrap().as_unsafe_handle();
         Ok(Self::handle(handle, WriteResources::Child(child)))
     }
 
@@ -615,15 +613,34 @@ impl Read for StreamReader {
 impl Peek for StreamReader {
     fn peek(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         match &mut self.resources {
-            ReadResources::File(file) => system_interface::io::Peek::peek(file, buf),
-            ReadResources::TcpStream(tcp_stream) => {
-                system_interface::io::Peek::peek(tcp_stream, buf)
-            }
+            ReadResources::File(file) => Peek::peek(file, buf),
+            ReadResources::TcpStream(tcp_stream) => Peek::peek(tcp_stream, buf),
             #[cfg(unix)]
-            ReadResources::UnixStream(unix_stream) => {
-                system_interface::io::Peek::peek(unix_stream, buf)
-            }
+            ReadResources::UnixStream(unix_stream) => Peek::peek(unix_stream, buf),
             _ => Ok(0),
+        }
+    }
+}
+
+impl ReadReady for StreamReader {
+    fn num_ready_bytes(&self) -> io::Result<u64> {
+        match &self.resources {
+            ReadResources::File(file) => ReadReady::num_ready_bytes(file),
+            ReadResources::TcpStream(tcp_stream) => ReadReady::num_ready_bytes(tcp_stream),
+            #[cfg(unix)]
+            ReadResources::UnixStream(unix_stream) => ReadReady::num_ready_bytes(unix_stream),
+            ReadResources::PipeReader(pipe_reader) => ReadReady::num_ready_bytes(pipe_reader),
+            ReadResources::Stdin(stdin) => ReadReady::num_ready_bytes(stdin),
+            #[cfg(not(target_os = "wasi"))]
+            ReadResources::PipedThread(piped_thread) => {
+                ReadReady::num_ready_bytes(&piped_thread.as_ref().unwrap().0)
+            }
+            #[cfg(not(target_os = "wasi"))]
+            ReadResources::Child(child) => ReadReady::num_ready_bytes(child.stdout.as_ref().unwrap()),
+            #[cfg(not(target_os = "wasi"))]
+            ReadResources::ChildStdout(child_stdout) => ReadReady::num_ready_bytes(child_stdout),
+            #[cfg(not(target_os = "wasi"))]
+            ReadResources::ChildStderr(child_stderr) => ReadReady::num_ready_bytes(child_stderr),
         }
     }
 }
@@ -750,22 +767,41 @@ impl Read for StreamInteractor {
 impl Peek for StreamInteractor {
     fn peek(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         match &mut self.resources {
-            InteractResources::TcpStream(tcp_stream) => {
-                system_interface::io::Peek::peek(tcp_stream, buf)
-            }
+            InteractResources::TcpStream(tcp_stream) => Peek::peek(tcp_stream, buf),
             #[cfg(unix)]
-            InteractResources::UnixStream(unix_stream) => {
-                system_interface::io::Peek::peek(unix_stream, buf)
-            }
+            InteractResources::UnixStream(unix_stream) => Peek::peek(unix_stream, buf),
             #[cfg(all(not(target_os = "wasi"), feature = "socketpair"))]
-            InteractResources::SocketpairStream(socketpair) => {
-                system_interface::io::Peek::peek(socketpair, buf)
-            }
+            InteractResources::SocketpairStream(socketpair) => Peek::peek(socketpair, buf),
             #[cfg(all(not(target_os = "wasi"), feature = "socketpair"))]
             InteractResources::SocketedThread(socketed_thread) => {
-                system_interface::io::Peek::peek(&mut socketed_thread.as_mut().unwrap().0, buf)
+                Peek::peek(&mut socketed_thread.as_mut().unwrap().0, buf)
             }
             _ => Ok(0),
+        }
+    }
+}
+
+impl ReadReady for StreamInteractor {
+    fn num_ready_bytes(&self) -> io::Result<u64> {
+        match &self.resources {
+            #[cfg(not(target_os = "wasi"))]
+            InteractResources::PipeReaderWriter((pipe_reader, _)) => ReadReady::num_ready_bytes(pipe_reader),
+            InteractResources::StdinStdout((stdin, _)) => ReadReady::num_ready_bytes(stdin),
+            #[cfg(not(target_os = "wasi"))]
+            InteractResources::Child(child) => ReadReady::num_ready_bytes(child.stdout.as_ref().unwrap()),
+            #[cfg(not(target_os = "wasi"))]
+            InteractResources::ChildStdoutStdin((child_stdout, _)) => ReadReady::num_ready_bytes(child_stdout),
+            #[cfg(feature = "char-device")]
+            InteractResources::CharDevice(char_device) => ReadReady::num_ready_bytes(char_device),
+            InteractResources::TcpStream(tcp_stream) => ReadReady::num_ready_bytes(tcp_stream),
+            #[cfg(unix)]
+            InteractResources::UnixStream(unix_stream) => ReadReady::num_ready_bytes(unix_stream),
+            #[cfg(all(not(target_os = "wasi"), feature = "socketpair"))]
+            InteractResources::SocketpairStream(socketpair_stream) => ReadReady::num_ready_bytes(socketpair_stream),
+            #[cfg(all(not(target_os = "wasi"), feature = "socketpair"))]
+            InteractResources::SocketedThread(socketed_thread) => {
+                ReadReady::num_ready_bytes(&socketed_thread.as_ref().unwrap().0)
+            }
         }
     }
 }

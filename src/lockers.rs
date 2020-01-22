@@ -16,6 +16,8 @@ use {
     std::os::windows::io::{AsRawHandle, RawHandle},
     unsafe_io::{AsRawHandleOrSocket, RawHandleOrSocket},
 };
+use system_interface::io::ReadReady;
+use unsafe_io::AsUnsafeFile;
 
 // Static handles to `stdin()` and `stdout()` so that we can reference
 // them with `StdinLock` and `StdoutLock` with `'static` lifetime
@@ -174,5 +176,12 @@ impl AsRawHandleOrSocket for StdoutLocker {
     #[inline]
     fn as_raw_handle_or_socket(&self) -> RawHandleOrSocket {
         RawHandleOrSocket::from_raw_handle(STDOUT.as_raw_handle())
+    }
+}
+
+impl ReadReady for StdinLocker {
+    #[inline]
+    fn num_ready_bytes(&self) -> io::Result<u64> {
+        self.as_pipe_reader_view().num_ready_bytes()
     }
 }
