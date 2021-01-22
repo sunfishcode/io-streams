@@ -14,7 +14,7 @@ use std::os::wasi::io::{AsRawFd, RawFd};
 use std::{
     fmt::{self, Arguments, Debug},
     fs::File,
-    io::{self, IoSlice, IoSliceMut, Read, Write},
+    io::{self, IoSlice, IoSliceMut, Read, Write, Seek},
     net::TcpStream,
 };
 use system_interface::io::{Peek, ReadReady};
@@ -165,7 +165,7 @@ impl StreamReader {
     ///
     /// This method can be passed a [`std::fs::File`] or similar `File` types.
     #[inline]
-    pub fn file<IUF: IntoUnsafeFile>(file: IUF) -> Self {
+    pub fn file<IUF: IntoUnsafeFile + Read + Write + Seek>(file: IUF) -> Self {
         Self::_file(file.into_unsafe_file())
     }
 
@@ -332,7 +332,7 @@ impl StreamWriter {
     ///
     /// This method can be passed a [`std::fs::File`] or similar `File` types.
     #[inline]
-    pub fn file<IUF: IntoUnsafeFile>(file: IUF) -> Self {
+    pub fn file<IUF: IntoUnsafeFile + Read + Write + Seek>(file: IUF) -> Self {
         Self::_file(file.into_unsafe_file())
     }
 
