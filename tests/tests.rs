@@ -139,7 +139,7 @@ fn test_null() -> anyhow::Result<()> {
 fn test_socketpair() -> anyhow::Result<()> {
     let mut thread = StreamInteractor::socketed_thread(Box::new(
         |mut stream: SocketpairStream| -> io::Result<SocketpairStream> {
-            let mut buf = [0u8; 4096];
+            let mut buf = [0_u8; 4096];
             let n = stream.read(&mut buf)?;
             assert_eq!(str::from_utf8(&buf[..n]).unwrap(), "hello world\n");
 
@@ -155,7 +155,7 @@ fn test_socketpair() -> anyhow::Result<()> {
     writeln!(thread, "hello world")?;
     thread.flush()?;
 
-    let mut buf = [0u8; 4096];
+    let mut buf = [0_u8; 4096];
     let n = thread.read(&mut buf)?;
     assert_eq!(str::from_utf8(&buf[..n]).unwrap(), "greetings\n");
 
