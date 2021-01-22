@@ -21,7 +21,7 @@ memchr = "2.3.4"
 once_cell = "1.3.1"
 parking = "2.0.0"
 socketpair = { version = "0.3.1", optional = true }
-system-interface = { path = "../system-interface", features = ["os_pipe"] }
+system-interface = { version = "0.5.3", features = ["os_pipe"] }
 terminal-support = { git = "https://github.com/sunfishcode/terminal-support", branch = "main", optional = true }
 unsafe-io = { version = "0.2.1", features = ["os_pipe"] }
 
