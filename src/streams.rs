@@ -14,7 +14,7 @@ use std::os::wasi::io::{AsRawFd, RawFd};
 use std::{
     fmt::{self, Arguments, Debug},
     fs::File,
-    io::{self, IoSlice, IoSliceMut, Read, Write, Seek},
+    io::{self, IoSlice, IoSliceMut, Read, Seek, Write},
     net::TcpStream,
 };
 use system_interface::io::{Peek, ReadReady};
