@@ -11,13 +11,13 @@ use std::{
     sync::atomic::{AtomicBool, Ordering::SeqCst},
     thread::{self, JoinHandle},
 };
+use system_interface::io::ReadReady;
+use unsafe_io::AsUnsafeFile;
 #[cfg(windows)]
 use {
     std::os::windows::io::{AsRawHandle, RawHandle},
     unsafe_io::{AsRawHandleOrSocket, RawHandleOrSocket},
 };
-use system_interface::io::ReadReady;
-use unsafe_io::AsUnsafeFile;
 
 // Static handles to `stdin()` and `stdout()` so that we can reference
 // them with `StdinLock` and `StdoutLock` with `'static` lifetime

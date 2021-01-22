@@ -636,7 +636,9 @@ impl ReadReady for StreamReader {
                 ReadReady::num_ready_bytes(&piped_thread.as_ref().unwrap().0)
             }
             #[cfg(not(target_os = "wasi"))]
-            ReadResources::Child(child) => ReadReady::num_ready_bytes(child.stdout.as_ref().unwrap()),
+            ReadResources::Child(child) => {
+                ReadReady::num_ready_bytes(child.stdout.as_ref().unwrap())
+            }
             #[cfg(not(target_os = "wasi"))]
             ReadResources::ChildStdout(child_stdout) => ReadReady::num_ready_bytes(child_stdout),
             #[cfg(not(target_os = "wasi"))]
@@ -785,19 +787,27 @@ impl ReadReady for StreamInteractor {
     fn num_ready_bytes(&self) -> io::Result<u64> {
         match &self.resources {
             #[cfg(not(target_os = "wasi"))]
-            InteractResources::PipeReaderWriter((pipe_reader, _)) => ReadReady::num_ready_bytes(pipe_reader),
+            InteractResources::PipeReaderWriter((pipe_reader, _)) => {
+                ReadReady::num_ready_bytes(pipe_reader)
+            }
             InteractResources::StdinStdout((stdin, _)) => ReadReady::num_ready_bytes(stdin),
             #[cfg(not(target_os = "wasi"))]
-            InteractResources::Child(child) => ReadReady::num_ready_bytes(child.stdout.as_ref().unwrap()),
+            InteractResources::Child(child) => {
+                ReadReady::num_ready_bytes(child.stdout.as_ref().unwrap())
+            }
             #[cfg(not(target_os = "wasi"))]
-            InteractResources::ChildStdoutStdin((child_stdout, _)) => ReadReady::num_ready_bytes(child_stdout),
+            InteractResources::ChildStdoutStdin((child_stdout, _)) => {
+                ReadReady::num_ready_bytes(child_stdout)
+            }
             #[cfg(feature = "char-device")]
             InteractResources::CharDevice(char_device) => ReadReady::num_ready_bytes(char_device),
             InteractResources::TcpStream(tcp_stream) => ReadReady::num_ready_bytes(tcp_stream),
             #[cfg(unix)]
             InteractResources::UnixStream(unix_stream) => ReadReady::num_ready_bytes(unix_stream),
             #[cfg(all(not(target_os = "wasi"), feature = "socketpair"))]
-            InteractResources::SocketpairStream(socketpair_stream) => ReadReady::num_ready_bytes(socketpair_stream),
+            InteractResources::SocketpairStream(socketpair_stream) => {
+                ReadReady::num_ready_bytes(socketpair_stream)
+            }
             #[cfg(all(not(target_os = "wasi"), feature = "socketpair"))]
             InteractResources::SocketedThread(socketed_thread) => {
                 ReadReady::num_ready_bytes(&socketed_thread.as_ref().unwrap().0)
