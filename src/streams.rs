@@ -23,7 +23,8 @@ use unsafe_io::AsRawReadWriteFd;
 #[cfg(windows)]
 use unsafe_io::{AsRawHandleOrSocket, AsRawReadWriteHandleOrSocket, RawHandleOrSocket};
 use unsafe_io::{
-    AsUnsafeHandle, AsUnsafeReadWriteHandle, UnsafeHandle, UnsafeReadable, UnsafeWriteable,
+    AsUnsafeHandle, AsUnsafeReadWriteHandle, FromUnsafeFile, FromUnsafeSocket, IntoUnsafeFile,
+    IntoUnsafeSocket, UnsafeFile, UnsafeHandle, UnsafeReadable, UnsafeSocket, UnsafeWriteable,
 };
 #[cfg(not(target_os = "wasi"))]
 use {
@@ -161,17 +162,44 @@ impl StreamReader {
     }
 
     /// Read from an open file, taking ownership of it.
+    ///
+    /// This method can be passed a [`std::fs::File`] or similar `File` types.
     #[inline]
-    pub fn file(file: File) -> Self {
+    pub fn file<IUF: IntoUnsafeFile>(file: IUF) -> Self {
+        Self::_file(file.into_unsafe_file())
+    }
+
+    #[inline]
+    fn _file(file: UnsafeFile) -> Self {
         let handle = file.as_unsafe_handle();
-        Self::handle(handle, ReadResources::File(file))
+        // Safety: We don't implement `From`/`Into` to allow the inner
+        // `File` to be extracted, so we don't need to worry that
+        // we're granting ambient authorities here.
+        Self::handle(
+            handle,
+            ReadResources::File(unsafe { File::from_unsafe_file(file) }),
+        )
     }
 
     /// Read from an open TCP stream, taking ownership of it.
+    ///
+    /// This method can be passed a [`std::net::TcpStream`] or similar
+    /// `TcpStream` types.
     #[inline]
-    pub fn tcp_stream(tcp_stream: TcpStream) -> Self {
-        let handle = tcp_stream.as_unsafe_handle();
-        Self::handle(handle, ReadResources::TcpStream(tcp_stream))
+    pub fn tcp_stream<IUS: IntoUnsafeSocket>(tcp_stream: IUS) -> Self {
+        Self::_tcp_stream(tcp_stream.into_unsafe_socket())
+    }
+
+    #[inline]
+    fn _tcp_stream(socket: UnsafeSocket) -> Self {
+        let handle = socket.as_unsafe_handle();
+        // Safety: We don't implement `From`/`Into` to allow the inner
+        // `TcpStream` to be extracted, so we don't need to worry that
+        // we're granting ambient authorities here.
+        Self::handle(
+            handle,
+            ReadResources::TcpStream(unsafe { TcpStream::from_unsafe_socket(socket) }),
+        )
     }
 
     /// Read from an open Unix-domain socket, taking ownership of it.
@@ -301,17 +329,44 @@ impl StreamWriter {
     }
 
     /// Write to an open file, taking ownership of it.
+    ///
+    /// This method can be passed a [`std::fs::File`] or similar `File` types.
     #[inline]
-    pub fn file(file: File) -> Self {
+    pub fn file<IUF: IntoUnsafeFile>(file: IUF) -> Self {
+        Self::_file(file.into_unsafe_file())
+    }
+
+    #[inline]
+    fn _file(file: UnsafeFile) -> Self {
         let handle = file.as_unsafe_handle();
-        Self::handle(handle, WriteResources::File(file))
+        // Safety: We don't implement `From`/`Into` to allow the inner
+        // `File` to be extracted, so we don't need to worry that
+        // we're granting ambient authorities here.
+        Self::handle(
+            handle,
+            WriteResources::File(unsafe { File::from_unsafe_file(file) }),
+        )
     }
 
     /// Write to an open TCP stream, taking ownership of it.
+    ///
+    /// This method can be passed a [`std::net::TcpStream`] or similar
+    /// `TcpStream` types.
     #[inline]
-    pub fn tcp_stream(tcp_stream: TcpStream) -> Self {
-        let handle = tcp_stream.as_unsafe_handle();
-        Self::handle(handle, WriteResources::TcpStream(tcp_stream))
+    pub fn tcp_stream<IUS: IntoUnsafeSocket>(tcp_stream: IUS) -> Self {
+        Self::_tcp_stream(tcp_stream.into_unsafe_socket())
+    }
+
+    #[inline]
+    fn _tcp_stream(socket: UnsafeSocket) -> Self {
+        let handle = socket.as_unsafe_handle();
+        // Safety: We don't implement `From`/`Into` to allow the inner
+        // `TcpStream` to be extracted, so we don't need to worry that
+        // we're granting ambient authorities here.
+        Self::handle(
+            handle,
+            WriteResources::TcpStream(unsafe { TcpStream::from_unsafe_socket(socket) }),
+        )
     }
 
     /// Write to an open Unix-domain stream, taking ownership of it.
@@ -449,10 +504,24 @@ impl StreamInteractor {
     }
 
     /// Interact with an open TCP stream, taking ownership of it.
+    ///
+    /// This method can be passed a [`std::net::TcpStream`] or similar
+    /// `TcpStream` types.
     #[inline]
-    pub fn tcp_stream(tcp_stream: TcpStream) -> Self {
-        let handle = tcp_stream.as_unsafe_handle();
-        Self::handle(handle, InteractResources::TcpStream(tcp_stream))
+    pub fn tcp_stream<IUS: IntoUnsafeSocket>(tcp_stream: IUS) -> Self {
+        Self::_tcp_stream(tcp_stream.into_unsafe_socket())
+    }
+
+    #[inline]
+    fn _tcp_stream(socket: UnsafeSocket) -> Self {
+        let handle = socket.as_unsafe_handle();
+        // Safety: We don't implement `From`/`Into` to allow the inner
+        // `TcpStream` to be extracted, so we don't need to worry that
+        // we're granting ambient authorities here.
+        Self::handle(
+            handle,
+            InteractResources::TcpStream(unsafe { TcpStream::from_unsafe_socket(socket) }),
+        )
     }
 
     /// Interact with an open Unix-domain stream, taking ownership of it.

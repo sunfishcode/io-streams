@@ -1,12 +1,9 @@
 #![cfg_attr(can_vector, feature(can_vector))]
 #![cfg_attr(write_all_vectored, feature(write_all_vectored))]
 
+use cap_tempfile::{tempdir, TempDir};
 use io_streams::{StreamReader, StreamWriter};
-use std::{
-    fs::{remove_file, File},
-    io::{copy, Read, Write},
-};
-use tempfile::{tempdir, TempDir};
+use std::io::{copy, Read, Write};
 #[cfg(all(not(target_os = "wasi"), feature = "socketpair"))]
 use {
     io_streams::StreamInteractor,
@@ -16,41 +13,41 @@ use {
 
 #[allow(unused)]
 fn tmpdir() -> TempDir {
-    tempdir().expect("expected to be able to create a temporary directory")
+    unsafe { tempdir() }.expect("expected to be able to create a temporary directory")
 }
 
 #[test]
 fn test_copy() -> anyhow::Result<()> {
     let dir = tmpdir();
-    let in_txt = dir.path().join("in.txt");
-    let out_txt = dir.path().join("out.txt");
+    let in_txt = "in.txt";
+    let out_txt = "out.txt";
 
-    let mut in_file = File::create(&in_txt)?;
+    let mut in_file = dir.create(&in_txt)?;
     write!(in_file, "Hello, world!")?;
 
     // Test regular file I/O.
     {
-        let mut input = StreamReader::file(File::open(&in_txt)?);
-        let mut output = StreamWriter::file(File::create(&out_txt)?);
+        let mut input = StreamReader::file(dir.open(&in_txt)?);
+        let mut output = StreamWriter::file(dir.create(&out_txt)?);
         copy(&mut input, &mut output)?;
         output.flush()?;
         let mut s = String::new();
-        File::open(&out_txt)?.read_to_string(&mut s)?;
+        dir.open(&out_txt)?.read_to_string(&mut s)?;
         assert_eq!(s, "Hello, world!");
-        remove_file(&out_txt)?;
+        dir.remove_file(&out_txt)?;
     }
 
     // Test I/O through piped threads.
     #[cfg(not(target_os = "wasi"))] // WASI doesn't support pipes yet
     {
-        let mut input = StreamReader::piped_thread(Box::new(File::open(&in_txt)?))?;
-        let mut output = StreamWriter::piped_thread(Box::new(File::create(&out_txt)?))?;
+        let mut input = StreamReader::piped_thread(Box::new(dir.open(&in_txt)?))?;
+        let mut output = StreamWriter::piped_thread(Box::new(dir.create(&out_txt)?))?;
         copy(&mut input, &mut output)?;
         output.flush()?;
         let mut s = String::new();
-        File::open(&out_txt)?.read_to_string(&mut s)?;
+        dir.open(&out_txt)?.read_to_string(&mut s)?;
         assert_eq!(s, "Hello, world!");
-        remove_file(&out_txt)?;
+        dir.remove_file(&out_txt)?;
     }
 
     // Test regular file I/O through piped threads, not because this is
@@ -60,65 +57,65 @@ fn test_copy() -> anyhow::Result<()> {
     #[cfg(not(target_os = "wasi"))] // WASI doesn't support pipes yet
     {
         let mut input =
-            StreamReader::piped_thread(Box::new(StreamReader::file(File::open(&in_txt)?)))?;
+            StreamReader::piped_thread(Box::new(StreamReader::file(dir.open(&in_txt)?)))?;
         let mut output =
-            StreamWriter::piped_thread(Box::new(StreamWriter::file(File::create(&out_txt)?)))?;
+            StreamWriter::piped_thread(Box::new(StreamWriter::file(dir.create(&out_txt)?)))?;
         copy(&mut input, &mut output)?;
         output.flush()?;
         let mut s = String::new();
-        File::open(&out_txt)?.read_to_string(&mut s)?;
+        dir.open(&out_txt)?.read_to_string(&mut s)?;
         assert_eq!(s, "Hello, world!");
-        remove_file(&out_txt)?;
+        dir.remove_file(&out_txt)?;
     }
 
     // They compose with themselves too.
     #[cfg(not(target_os = "wasi"))] // WASI doesn't support pipes yet
     {
         let mut input = StreamReader::piped_thread(Box::new(StreamReader::piped_thread(
-            Box::new(StreamReader::file(File::open(&in_txt)?)),
+            Box::new(StreamReader::file(dir.open(&in_txt)?)),
         )?))?;
         let mut output = StreamWriter::piped_thread(Box::new(StreamWriter::piped_thread(
-            Box::new(StreamWriter::file(File::create(&out_txt)?)),
+            Box::new(StreamWriter::file(dir.create(&out_txt)?)),
         )?))?;
         copy(&mut input, &mut output)?;
         output.flush()?;
         let mut s = String::new();
-        File::open(&out_txt)?.read_to_string(&mut s)?;
+        dir.open(&out_txt)?.read_to_string(&mut s)?;
         assert_eq!(s, "Hello, world!");
-        remove_file(&out_txt)?;
+        dir.remove_file(&out_txt)?;
     }
 
     // Test flushing between writes.
     #[cfg(not(target_os = "wasi"))] // WASI doesn't support pipes yet
     {
         let mut input = StreamReader::piped_thread(Box::new(StreamReader::piped_thread(
-            Box::new(StreamReader::file(File::open(&in_txt)?)),
+            Box::new(StreamReader::file(dir.open(&in_txt)?)),
         )?))?;
         let mut output = StreamWriter::piped_thread(Box::new(StreamWriter::piped_thread(
-            Box::new(StreamWriter::file(File::create(&out_txt)?)),
+            Box::new(StreamWriter::file(dir.create(&out_txt)?)),
         )?))?;
         copy(&mut input, &mut output)?;
         output.flush()?;
         let mut s = String::new();
-        File::open(&out_txt)?.read_to_string(&mut s)?;
+        dir.open(&out_txt)?.read_to_string(&mut s)?;
         assert_eq!(s, "Hello, world!");
         input = StreamReader::piped_thread(Box::new(StreamReader::piped_thread(Box::new(
-            StreamReader::file(File::open(&in_txt)?),
+            StreamReader::file(dir.open(&in_txt)?),
         ))?))?;
         copy(&mut input, &mut output)?;
         output.flush()?;
         s = String::new();
-        File::open(&out_txt)?.read_to_string(&mut s)?;
+        dir.open(&out_txt)?.read_to_string(&mut s)?;
         assert_eq!(s, "Hello, world!Hello, world!");
         input = StreamReader::piped_thread(Box::new(StreamReader::piped_thread(Box::new(
-            StreamReader::file(File::open(&in_txt)?),
+            StreamReader::file(dir.open(&in_txt)?),
         ))?))?;
         copy(&mut input, &mut output)?;
         output.flush()?;
         s = String::new();
-        File::open(&out_txt)?.read_to_string(&mut s)?;
+        dir.open(&out_txt)?.read_to_string(&mut s)?;
         assert_eq!(s, "Hello, world!Hello, world!Hello, world!");
-        remove_file(&out_txt)?;
+        dir.remove_file(&out_txt)?;
     }
 
     Ok(())
