@@ -229,16 +229,16 @@ impl StreamReader {
     }
 
     /// Read from a child process' standard output, taking ownership of it.
-    #[inline]
     #[cfg(not(target_os = "wasi"))] // WASI doesn't support pipes yet
+    #[inline]
     pub fn child_stdout(child_stdout: ChildStdout) -> Self {
         let handle = child_stdout.as_unsafe_handle();
         Self::handle(handle, ReadResources::ChildStdout(child_stdout))
     }
 
     /// Read from a child process' standard error, taking ownership of it.
-    #[inline]
     #[cfg(not(target_os = "wasi"))] // WASI doesn't support pipes yet
+    #[inline]
     pub fn child_stderr(child_stderr: ChildStderr) -> Self {
         let handle = child_stderr.as_unsafe_handle();
         Self::handle(handle, ReadResources::ChildStderr(child_stderr))
@@ -378,8 +378,8 @@ impl StreamWriter {
     }
 
     /// Write to the writing end of an open pipe, taking ownership of it.
-    #[inline]
     #[cfg(not(target_os = "wasi"))] // WASI doesn't support pipes yet
+    #[inline]
     pub fn pipe_writer(pipe_writer: PipeWriter) -> Self {
         let handle = pipe_writer.as_unsafe_handle();
         Self::handle(handle, WriteResources::PipeWriter(pipe_writer))
@@ -397,8 +397,8 @@ impl StreamWriter {
     }
 
     /// Write to the given child standard input, taking ownership of it.
-    #[inline]
     #[cfg(not(target_os = "wasi"))] // WASI doesn't support pipes yet
+    #[inline]
     pub fn child_stdin(child_stdin: ChildStdin) -> Self {
         let handle = child_stdin.as_unsafe_handle();
         Self::handle(handle, WriteResources::ChildStdin(child_stdin))
@@ -532,8 +532,8 @@ impl StreamInteractor {
     }
 
     /// Interact a pair of pipe streams, taking ownership of them.
-    #[inline]
     #[cfg(not(target_os = "wasi"))] // WASI doesn't support pipes yet
+    #[inline]
     pub fn pipe_reader_writer(pipe_reader: PipeReader, pipe_writer: PipeWriter) -> Self {
         let read = pipe_reader.as_unsafe_handle();
         let write = pipe_writer.as_unsafe_handle();
@@ -569,8 +569,8 @@ impl StreamInteractor {
 
     /// Interact with a child process' stdout and stdin, taking ownership of
     /// them.
-    #[inline]
     #[cfg(not(target_os = "wasi"))] // WASI doesn't support pipes yet
+    #[inline]
     pub fn child_stdout_stdin(child_stdout: ChildStdout, child_stdin: ChildStdin) -> Self {
         let read = child_stdout.as_unsafe_handle();
         let write = child_stdin.as_unsafe_handle();
