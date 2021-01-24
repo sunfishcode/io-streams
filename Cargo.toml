@@ -23,7 +23,7 @@ parking = "2.0.0"
 socketpair = { version = "0.3.1", optional = true }
 system-interface = { version = "0.5.3", features = ["os_pipe"] }
 terminal-support = { git = "https://github.com/sunfishcode/terminal-support", branch = "main", optional = true }
-unsafe-io = { version = "0.2.1", features = ["os_pipe"] }
+unsafe-io = { version = "0.3.0", features = ["os_pipe"] }
 
 # WASI doesn't support pipes yet
 [target.'cfg(not(target_os = "wasi"))'.dependencies]
