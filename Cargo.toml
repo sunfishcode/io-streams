@@ -35,6 +35,9 @@ libc = "0.2.81"
 [dev-dependencies]
 anyhow = "1.0.38"
 cap-tempfile = "0.11.0"
+char-device = "0.0.0"
+system-interface = { version = "0.5.3", features = ["char-device"] }
+interact-trait = { git = "https://github.com/sunfishcode/interact-trait", branch = "main", features = ["char-device"] }
 
 [features]
 default = []
