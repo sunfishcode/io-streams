@@ -165,6 +165,7 @@ impl StreamReader {
     ///
     /// This method can be passed a [`std::fs::File`] or similar `File` types.
     #[inline]
+    #[must_use]
     pub fn file<Filelike: IntoUnsafeFile + Read + Write + Seek>(filelike: Filelike) -> Self {
         // Safety: We don't implement `From`/`Into` to allow the inner `File`
         // to be extracted, so we don't need to worry that we're granting
@@ -173,6 +174,7 @@ impl StreamReader {
     }
 
     #[inline]
+    #[must_use]
     fn _file(file: File) -> Self {
         let handle = file.as_unsafe_handle();
         Self::handle(handle, ReadResources::File(file))
@@ -183,11 +185,13 @@ impl StreamReader {
     /// This method can be passed a [`std::net::TcpStream`] or similar
     /// `TcpStream` types.
     #[inline]
+    #[must_use]
     pub fn tcp_stream<Socketlike: IntoUnsafeSocket>(socketlike: Socketlike) -> Self {
         Self::_tcp_stream(TcpStream::from_socketlike(socketlike))
     }
 
     #[inline]
+    #[must_use]
     fn _tcp_stream(tcp_stream: TcpStream) -> Self {
         let handle = tcp_stream.as_unsafe_handle();
         // Safety: We don't implement `From`/`Into` to allow the inner
@@ -199,6 +203,7 @@ impl StreamReader {
     /// Read from an open Unix-domain socket, taking ownership of it.
     #[cfg(unix)]
     #[inline]
+    #[must_use]
     pub fn unix_stream(unix_stream: UnixStream) -> Self {
         let handle = unix_stream.as_unsafe_handle();
         Self::handle(handle, ReadResources::UnixStream(unix_stream))
@@ -207,6 +212,7 @@ impl StreamReader {
     /// Read from the reading end of an open pipe, taking ownership of it.
     #[cfg(not(target_os = "wasi"))] // WASI doesn't support pipes yet
     #[inline]
+    #[must_use]
     pub fn pipe_reader(pipe_reader: PipeReader) -> Self {
         let handle = pipe_reader.as_unsafe_handle();
         Self::handle(handle, ReadResources::PipeReader(pipe_reader))
@@ -225,6 +231,7 @@ impl StreamReader {
     /// Read from a child process' standard output, taking ownership of it.
     #[cfg(not(target_os = "wasi"))] // WASI doesn't support pipes yet
     #[inline]
+    #[must_use]
     pub fn child_stdout(child_stdout: ChildStdout) -> Self {
         let handle = child_stdout.as_unsafe_handle();
         Self::handle(handle, ReadResources::ChildStdout(child_stdout))
@@ -233,6 +240,7 @@ impl StreamReader {
     /// Read from a child process' standard error, taking ownership of it.
     #[cfg(not(target_os = "wasi"))] // WASI doesn't support pipes yet
     #[inline]
+    #[must_use]
     pub fn child_stderr(child_stderr: ChildStderr) -> Self {
         let handle = child_stderr.as_unsafe_handle();
         Self::handle(handle, ReadResources::ChildStderr(child_stderr))
@@ -282,6 +290,7 @@ impl StreamReader {
     }
 
     #[inline]
+    #[must_use]
     fn handle(handle: UnsafeHandle, resources: ReadResources) -> Self {
         Self {
             handle: unsafe { handle.as_readable() },
@@ -326,6 +335,7 @@ impl StreamWriter {
     ///
     /// This method can be passed a [`std::fs::File`] or similar `File` types.
     #[inline]
+    #[must_use]
     pub fn file<Filelike: IntoUnsafeFile + Read + Write + Seek>(filelike: Filelike) -> Self {
         // Safety: We don't implement `From`/`Into` to allow the inner `File`
         // to be extracted, so we don't need to worry that we're granting
@@ -334,6 +344,7 @@ impl StreamWriter {
     }
 
     #[inline]
+    #[must_use]
     fn _file(file: File) -> Self {
         let handle = file.as_unsafe_handle();
         Self::handle(handle, WriteResources::File(file))
@@ -344,6 +355,7 @@ impl StreamWriter {
     /// This method can be passed a [`std::net::TcpStream`] or similar
     /// `TcpStream` types.
     #[inline]
+    #[must_use]
     pub fn tcp_stream<Socketlike: IntoUnsafeSocket>(socketlike: Socketlike) -> Self {
         // Safety: We don't implement `From`/`Into` to allow the inner
         // `TcpStream` to be extracted, so we don't need to worry that we're
@@ -352,6 +364,7 @@ impl StreamWriter {
     }
 
     #[inline]
+    #[must_use]
     fn _tcp_stream(tcp_stream: TcpStream) -> Self {
         let handle = tcp_stream.as_unsafe_handle();
         Self::handle(handle, WriteResources::TcpStream(tcp_stream))
@@ -360,6 +373,7 @@ impl StreamWriter {
     /// Write to an open Unix-domain stream, taking ownership of it.
     #[cfg(unix)]
     #[inline]
+    #[must_use]
     pub fn unix_stream(unix_stream: UnixStream) -> Self {
         let handle = unix_stream.as_unsafe_handle();
         Self::handle(handle, WriteResources::UnixStream(unix_stream))
@@ -368,6 +382,7 @@ impl StreamWriter {
     /// Write to the writing end of an open pipe, taking ownership of it.
     #[cfg(not(target_os = "wasi"))] // WASI doesn't support pipes yet
     #[inline]
+    #[must_use]
     pub fn pipe_writer(pipe_writer: PipeWriter) -> Self {
         let handle = pipe_writer.as_unsafe_handle();
         Self::handle(handle, WriteResources::PipeWriter(pipe_writer))
@@ -387,6 +402,7 @@ impl StreamWriter {
     /// Write to the given child standard input, taking ownership of it.
     #[cfg(not(target_os = "wasi"))] // WASI doesn't support pipes yet
     #[inline]
+    #[must_use]
     pub fn child_stdin(child_stdin: ChildStdin) -> Self {
         let handle = child_stdin.as_unsafe_handle();
         Self::handle(handle, WriteResources::ChildStdin(child_stdin))
@@ -486,6 +502,7 @@ impl StreamInteractor {
     /// Interact with an open character device, taking ownership of it.
     #[cfg(feature = "char-device")]
     #[inline]
+    #[must_use]
     pub fn char_device(char_device: CharDevice) -> Self {
         let handle = char_device.as_unsafe_handle();
         Self::handle(handle, InteractResources::CharDevice(char_device))
@@ -496,11 +513,13 @@ impl StreamInteractor {
     /// This method can be passed a [`std::net::TcpStream`] or similar
     /// `TcpStream` types.
     #[inline]
+    #[must_use]
     pub fn tcp_stream<Socketlike: IntoUnsafeSocket>(socketlike: Socketlike) -> Self {
         Self::_tcp_stream(TcpStream::from_socketlike(socketlike))
     }
 
     #[inline]
+    #[must_use]
     fn _tcp_stream(tcp_stream: TcpStream) -> Self {
         let handle = tcp_stream.as_unsafe_handle();
         // Safety: We don't implement `From`/`Into` to allow the inner
@@ -511,6 +530,7 @@ impl StreamInteractor {
 
     /// Interact with an open Unix-domain stream, taking ownership of it.
     #[cfg(unix)]
+    #[must_use]
     pub fn unix_stream(unix_stream: UnixStream) -> Self {
         let handle = unix_stream.as_unsafe_handle();
         Self::handle(handle, InteractResources::UnixStream(unix_stream))
@@ -519,6 +539,7 @@ impl StreamInteractor {
     /// Interact a pair of pipe streams, taking ownership of them.
     #[cfg(not(target_os = "wasi"))] // WASI doesn't support pipes yet
     #[inline]
+    #[must_use]
     pub fn pipe_reader_writer(pipe_reader: PipeReader, pipe_writer: PipeWriter) -> Self {
         let read = pipe_reader.as_unsafe_handle();
         let write = pipe_writer.as_unsafe_handle();
@@ -531,6 +552,7 @@ impl StreamInteractor {
 
     /// Interact with one end of a socketpair stream, taking ownership of it.
     #[cfg(all(not(target_os = "wasi"), feature = "socketpair"))]
+    #[must_use]
     pub fn socketpair_stream(stream: SocketpairStream) -> Self {
         let handle = stream.as_unsafe_handle();
         Self::handle(handle, InteractResources::SocketpairStream(stream))
@@ -556,6 +578,7 @@ impl StreamInteractor {
     /// them.
     #[cfg(not(target_os = "wasi"))] // WASI doesn't support pipes yet
     #[inline]
+    #[must_use]
     pub fn child_stdout_stdin(child_stdout: ChildStdout, child_stdin: ChildStdin) -> Self {
         let read = child_stdout.as_unsafe_handle();
         let write = child_stdin.as_unsafe_handle();
@@ -592,6 +615,7 @@ impl StreamInteractor {
     }
 
     #[inline]
+    #[must_use]
     fn handle(handle: UnsafeHandle, resources: InteractResources) -> Self {
         Self {
             read_handle: unsafe { handle.as_readable() },
@@ -601,6 +625,7 @@ impl StreamInteractor {
     }
 
     #[inline]
+    #[must_use]
     fn two_handles(read: UnsafeHandle, write: UnsafeHandle, resources: InteractResources) -> Self {
         Self {
             read_handle: unsafe { read.as_readable() },
