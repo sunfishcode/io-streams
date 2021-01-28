@@ -2,9 +2,9 @@
 //! f7801d6c7cc19ab22bdebcc8efa894a564c53469.
 
 use super::{buf_duplexer::BufDuplexerBackend, BufReaderLineWriterShim, IntoInnerError};
-use duplex::{Duplex, HalfDuplex};
-#[cfg(feature = "io-ext")]
-use io_ext::{Bufferable, HalfDuplexExt};
+use duplex::HalfDuplex;
+#[cfg(feature = "layered-io")]
+use layered_io::{Bufferable, HalfDuplexLayered};
 #[cfg(read_initializer)]
 use std::io::Initializer;
 use std::{
@@ -470,24 +470,24 @@ impl<Inner: HalfDuplex + AsUnsafeHandle> AsUnsafeHandle for BufReaderLineWriterB
     }
 }
 
-#[cfg(feature = "terminal-support")]
-impl<Inner: HalfDuplex + terminal_support::Terminal> terminal_support::Terminal
+#[cfg(feature = "terminal-io")]
+impl<Inner: HalfDuplex + terminal_io::Terminal> terminal_io::Terminal
     for BufReaderLineWriter<Inner>
 {
 }
 
-#[cfg(feature = "terminal-support")]
-impl<Inner: HalfDuplex + terminal_support::Terminal> terminal_support::Terminal
+#[cfg(feature = "terminal-io")]
+impl<Inner: HalfDuplex + terminal_io::Terminal> terminal_io::Terminal
     for BufReaderLineWriterBackend<Inner>
 {
 }
 
-#[cfg(feature = "terminal-support")]
-impl<Inner: Duplex + Read + terminal_support::WriteTerminal> terminal_support::WriteTerminal
+#[cfg(feature = "terminal-io")]
+impl<Inner: HalfDuplex + terminal_io::WriteTerminal> terminal_io::WriteTerminal
     for BufReaderLineWriter<Inner>
 {
     #[inline]
-    fn color_support(&self) -> terminal_support::TerminalColorSupport {
+    fn color_support(&self) -> terminal_io::TerminalColorSupport {
         self.inner.color_support()
     }
 
@@ -502,12 +502,12 @@ impl<Inner: Duplex + Read + terminal_support::WriteTerminal> terminal_support::W
     }
 }
 
-#[cfg(feature = "terminal-support")]
-impl<Inner: Duplex + Read + terminal_support::WriteTerminal> terminal_support::WriteTerminal
+#[cfg(feature = "terminal-io")]
+impl<Inner: HalfDuplex + terminal_io::WriteTerminal> terminal_io::WriteTerminal
     for BufReaderLineWriterBackend<Inner>
 {
     #[inline]
-    fn color_support(&self) -> terminal_support::TerminalColorSupport {
+    fn color_support(&self) -> terminal_io::TerminalColorSupport {
         self.inner.color_support()
     }
 
@@ -522,8 +522,8 @@ impl<Inner: Duplex + Read + terminal_support::WriteTerminal> terminal_support::W
     }
 }
 
-#[cfg(feature = "io-ext")]
-impl<Inner: HalfDuplexExt + Bufferable> Bufferable for BufReaderLineWriter<Inner> {
+#[cfg(feature = "layered-io")]
+impl<Inner: HalfDuplexLayered + Bufferable> Bufferable for BufReaderLineWriter<Inner> {
     #[inline]
     fn abandon(&mut self) {
         self.inner.abandon()
@@ -535,8 +535,8 @@ impl<Inner: HalfDuplexExt + Bufferable> Bufferable for BufReaderLineWriter<Inner
     }
 }
 
-#[cfg(feature = "io-ext")]
-impl<Inner: HalfDuplexExt + Bufferable> Bufferable for BufReaderLineWriterBackend<Inner> {
+#[cfg(feature = "layered-io")]
+impl<Inner: HalfDuplexLayered + Bufferable> Bufferable for BufReaderLineWriterBackend<Inner> {
     #[inline]
     fn abandon(&mut self) {
         self.inner.abandon()
