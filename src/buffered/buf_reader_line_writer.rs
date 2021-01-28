@@ -1,12 +1,10 @@
 //! This file is derived from Rust's library/std/src/io/buffered at revision
 //! f7801d6c7cc19ab22bdebcc8efa894a564c53469.
 
-use super::{buf_interactor::BufInteractorBackend, BufReaderLineWriterShim, IntoInnerError};
-use interact_trait::Interact;
+use super::{buf_duplexer::BufDuplexerBackend, BufReaderLineWriterShim, IntoInnerError};
+use duplex::{Duplex, HalfDuplex};
 #[cfg(feature = "io-ext")]
-use interact_trait::InteractExt;
-#[cfg(feature = "io-ext")]
-use io_ext::Bufferable;
+use io_ext::{Bufferable, HalfDuplexExt};
 #[cfg(read_initializer)]
 use std::io::Initializer;
 use std::{
@@ -18,13 +16,13 @@ use unsafe_io::{AsUnsafeHandle, UnsafeHandle};
 /// Wraps a reader and writer and buffers input and output to and from it, flushing
 /// the writer whenever a newline (`0x0a`, `'\n'`) is detected on output.
 ///
-/// The [`BufInteractor`] struct wraps a reader and writer and buffers their input and output.
+/// The [`BufDuplexer`] struct wraps a reader and writer and buffers their input and output.
 /// But it only does this batched write when it goes out of scope, or when the
 /// internal buffer is full. Sometimes, you'd prefer to write each line as it's
 /// completed, rather than the entire buffer at once. Enter `BufReaderLineWriter`. It
 /// does exactly that.
 ///
-/// Like [`BufInteractor`], a `BufReaderLineWriter`’s buffer will also be flushed when the
+/// Like [`BufDuplexer`], a `BufReaderLineWriter`’s buffer will also be flushed when the
 /// `BufReaderLineWriter` goes out of scope or when its internal buffer is full.
 ///
 /// If there's still a partial line in the buffer when the `BufReaderLineWriter` is
@@ -80,20 +78,20 @@ use unsafe_io::{AsUnsafeHandle, UnsafeHandle};
 /// }
 /// ```
 ///
-/// [`BufInteractor`]: crate::BufInteractor
-pub struct BufReaderLineWriter<Inter: Interact> {
-    inner: BufReaderLineWriterBackend<Inter>,
+/// [`BufDuplexer`]: crate::BufDuplexer
+pub struct BufReaderLineWriter<Inner: HalfDuplex> {
+    inner: BufReaderLineWriterBackend<Inner>,
 }
 
 /// The "backend" of `BufReaderLineWriter`, split off so that the public
 /// `BufReaderLineWriter` functions can do extra flushing, and we can
 /// use the private `BufReaderLineWriterBackend` functions internally
 /// after flushing is already done.
-struct BufReaderLineWriterBackend<Inter: Interact> {
-    inner: BufInteractorBackend<Inter>,
+struct BufReaderLineWriterBackend<Inner: HalfDuplex> {
+    inner: BufDuplexerBackend<Inner>,
 }
 
-impl<Inter: Interact> BufReaderLineWriter<Inter> {
+impl<Inner: HalfDuplex> BufReaderLineWriter<Inner> {
     /// Creates a new `BufReaderLineWriter`.
     ///
     /// # Examples
@@ -109,7 +107,7 @@ impl<Inter: Interact> BufReaderLineWriter<Inter> {
     /// }
     /// ```
     #[inline]
-    pub fn new(inner: Inter) -> Self {
+    pub fn new(inner: Inner) -> Self {
         Self {
             inner: BufReaderLineWriterBackend::new(inner),
         }
@@ -131,7 +129,7 @@ impl<Inter: Interact> BufReaderLineWriter<Inter> {
     /// }
     /// ```
     #[inline]
-    pub fn with_capacities(reader_capacity: usize, writer_capacity: usize, inner: Inter) -> Self {
+    pub fn with_capacities(reader_capacity: usize, writer_capacity: usize, inner: Inner) -> Self {
         Self {
             inner: BufReaderLineWriterBackend::with_capacities(
                 reader_capacity,
@@ -158,7 +156,7 @@ impl<Inter: Interact> BufReaderLineWriter<Inter> {
     /// }
     /// ```
     #[inline]
-    pub fn get_ref(&self) -> &Inter {
+    pub fn get_ref(&self) -> &Inner {
         self.inner.get_ref()
     }
 
@@ -183,7 +181,7 @@ impl<Inter: Interact> BufReaderLineWriter<Inter> {
     /// }
     /// ```
     #[inline]
-    pub fn get_mut(&mut self) -> &mut Inter {
+    pub fn get_mut(&mut self) -> &mut Inner {
         self.inner.get_mut()
     }
 
@@ -211,43 +209,43 @@ impl<Inter: Interact> BufReaderLineWriter<Inter> {
     /// }
     /// ```
     #[inline]
-    pub fn into_inner(self) -> Result<Inter, IntoInnerError<Self>> {
+    pub fn into_inner(self) -> Result<Inner, IntoInnerError<Self>> {
         self.inner
             .into_inner()
             .map_err(|err| err.new_wrapped(|inner| Self { inner }))
     }
 }
 
-impl<Inter: Interact> BufReaderLineWriterBackend<Inter> {
-    pub fn new(inner: Inter) -> Self {
+impl<Inner: HalfDuplex> BufReaderLineWriterBackend<Inner> {
+    pub fn new(inner: Inner) -> Self {
         // Lines typically aren't that long, don't use giant buffers
         Self::with_capacities(1024, 1024, inner)
     }
 
-    pub fn with_capacities(reader_capacity: usize, writer_capacity: usize, inner: Inter) -> Self {
+    pub fn with_capacities(reader_capacity: usize, writer_capacity: usize, inner: Inner) -> Self {
         Self {
-            inner: BufInteractorBackend::with_capacities(reader_capacity, writer_capacity, inner),
+            inner: BufDuplexerBackend::with_capacities(reader_capacity, writer_capacity, inner),
         }
     }
 
     #[inline]
-    pub fn get_ref(&self) -> &Inter {
+    pub fn get_ref(&self) -> &Inner {
         self.inner.get_ref()
     }
 
     #[inline]
-    pub fn get_mut(&mut self) -> &mut Inter {
+    pub fn get_mut(&mut self) -> &mut Inner {
         self.inner.get_mut()
     }
 
-    pub fn into_inner(self) -> Result<Inter, IntoInnerError<Self>> {
+    pub fn into_inner(self) -> Result<Inner, IntoInnerError<Self>> {
         self.inner
             .into_inner()
             .map_err(|err| err.new_wrapped(|inner| Self { inner }))
     }
 }
 
-impl<Inter: Interact> Write for BufReaderLineWriter<Inter> {
+impl<Inner: HalfDuplex> Write for BufReaderLineWriter<Inner> {
     #[inline]
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         self.inner.write(buf)
@@ -286,7 +284,7 @@ impl<Inter: Interact> Write for BufReaderLineWriter<Inter> {
     }
 }
 
-impl<Inter: Interact> Write for BufReaderLineWriterBackend<Inter> {
+impl<Inner: HalfDuplex> Write for BufReaderLineWriterBackend<Inner> {
     #[inline]
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         BufReaderLineWriterShim::new(&mut self.inner).write(buf)
@@ -325,7 +323,7 @@ impl<Inter: Interact> Write for BufReaderLineWriterBackend<Inter> {
     }
 }
 
-impl<Inter: Interact> Read for BufReaderLineWriter<Inter> {
+impl<Inner: HalfDuplex> Read for BufReaderLineWriter<Inner> {
     #[inline]
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         // Flush the output buffer before reading.
@@ -355,7 +353,7 @@ impl<Inter: Interact> Read for BufReaderLineWriter<Inter> {
     }
 }
 
-impl<Inter: Interact> Read for BufReaderLineWriterBackend<Inter> {
+impl<Inner: HalfDuplex> Read for BufReaderLineWriterBackend<Inner> {
     #[inline]
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         self.inner.read(buf)
@@ -380,7 +378,7 @@ impl<Inter: Interact> Read for BufReaderLineWriterBackend<Inter> {
     }
 }
 
-impl<Inter: Interact> BufRead for BufReaderLineWriter<Inter> {
+impl<Inner: HalfDuplex> BufRead for BufReaderLineWriter<Inner> {
     #[inline]
     fn fill_buf(&mut self) -> io::Result<&[u8]> {
         self.inner.fill_buf()
@@ -410,7 +408,7 @@ impl<Inter: Interact> BufRead for BufReaderLineWriter<Inter> {
     }
 }
 
-impl<Inter: Interact> BufRead for BufReaderLineWriterBackend<Inter> {
+impl<Inner: HalfDuplex> BufRead for BufReaderLineWriterBackend<Inner> {
     #[inline]
     fn fill_buf(&mut self) -> io::Result<&[u8]> {
         self.inner.fill_buf()
@@ -422,18 +420,18 @@ impl<Inter: Interact> BufRead for BufReaderLineWriterBackend<Inter> {
     }
 }
 
-impl<Inter: Interact> fmt::Debug for BufReaderLineWriter<Inter>
+impl<Inner: HalfDuplex> fmt::Debug for BufReaderLineWriter<Inner>
 where
-    Inter: fmt::Debug,
+    Inner: fmt::Debug,
 {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.inner.fmt(fmt)
     }
 }
 
-impl<Inter: Interact> fmt::Debug for BufReaderLineWriterBackend<Inter>
+impl<Inner: HalfDuplex> fmt::Debug for BufReaderLineWriterBackend<Inner>
 where
-    Inter: fmt::Debug,
+    Inner: fmt::Debug,
 {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_struct("BufReaderLineWriter")
@@ -458,14 +456,14 @@ where
     }
 }
 
-impl<Inter: Interact + AsUnsafeHandle> AsUnsafeHandle for BufReaderLineWriter<Inter> {
+impl<Inner: HalfDuplex + AsUnsafeHandle> AsUnsafeHandle for BufReaderLineWriter<Inner> {
     #[inline]
     fn as_unsafe_handle(&self) -> UnsafeHandle {
         self.inner.as_unsafe_handle()
     }
 }
 
-impl<Inter: Interact + AsUnsafeHandle> AsUnsafeHandle for BufReaderLineWriterBackend<Inter> {
+impl<Inner: HalfDuplex + AsUnsafeHandle> AsUnsafeHandle for BufReaderLineWriterBackend<Inner> {
     #[inline]
     fn as_unsafe_handle(&self) -> UnsafeHandle {
         self.inner.as_unsafe_handle()
@@ -473,20 +471,20 @@ impl<Inter: Interact + AsUnsafeHandle> AsUnsafeHandle for BufReaderLineWriterBac
 }
 
 #[cfg(feature = "terminal-support")]
-impl<Inter: Interact + terminal_support::Terminal> terminal_support::Terminal
-    for BufReaderLineWriter<Inter>
+impl<Inner: HalfDuplex + terminal_support::Terminal> terminal_support::Terminal
+    for BufReaderLineWriter<Inner>
 {
 }
 
 #[cfg(feature = "terminal-support")]
-impl<Inter: Interact + terminal_support::Terminal> terminal_support::Terminal
-    for BufReaderLineWriterBackend<Inter>
+impl<Inner: HalfDuplex + terminal_support::Terminal> terminal_support::Terminal
+    for BufReaderLineWriterBackend<Inner>
 {
 }
 
 #[cfg(feature = "terminal-support")]
-impl<Inter: Interact + terminal_support::WriteTerminal> terminal_support::WriteTerminal
-    for BufReaderLineWriter<Inter>
+impl<Inner: Duplex + Read + terminal_support::WriteTerminal> terminal_support::WriteTerminal
+    for BufReaderLineWriter<Inner>
 {
     #[inline]
     fn color_support(&self) -> terminal_support::TerminalColorSupport {
@@ -505,8 +503,8 @@ impl<Inter: Interact + terminal_support::WriteTerminal> terminal_support::WriteT
 }
 
 #[cfg(feature = "terminal-support")]
-impl<Inter: Interact + terminal_support::WriteTerminal> terminal_support::WriteTerminal
-    for BufReaderLineWriterBackend<Inter>
+impl<Inner: Duplex + Read + terminal_support::WriteTerminal> terminal_support::WriteTerminal
+    for BufReaderLineWriterBackend<Inner>
 {
     #[inline]
     fn color_support(&self) -> terminal_support::TerminalColorSupport {
@@ -525,7 +523,7 @@ impl<Inter: Interact + terminal_support::WriteTerminal> terminal_support::WriteT
 }
 
 #[cfg(feature = "io-ext")]
-impl<Inter: InteractExt + Bufferable> Bufferable for BufReaderLineWriter<Inter> {
+impl<Inner: HalfDuplexExt + Bufferable> Bufferable for BufReaderLineWriter<Inner> {
     #[inline]
     fn abandon(&mut self) {
         self.inner.abandon()
@@ -538,7 +536,7 @@ impl<Inter: InteractExt + Bufferable> Bufferable for BufReaderLineWriter<Inter> 
 }
 
 #[cfg(feature = "io-ext")]
-impl<Inter: InteractExt + Bufferable> Bufferable for BufReaderLineWriterBackend<Inter> {
+impl<Inner: HalfDuplexExt + Bufferable> Bufferable for BufReaderLineWriterBackend<Inner> {
     #[inline]
     fn abandon(&mut self) {
         self.inner.abandon()

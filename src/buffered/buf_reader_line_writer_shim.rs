@@ -1,35 +1,35 @@
 //! This file is derived from Rust's library/std/src/io/buffered at revision
 //! f7801d6c7cc19ab22bdebcc8efa894a564c53469.
 
-use super::buf_interactor::BufInteractorBackend;
-use interact_trait::Interact;
+use super::buf_duplexer::BufDuplexerBackend;
+use duplex::HalfDuplex;
 use std::io::{self, IoSlice, Write};
 
 /// Private helper struct for implementing the line-buffered writing logic.
-/// This shim temporarily wraps a `BufInteractor`, and uses its internals to
+/// This shim temporarily wraps a `BufDuplexer`, and uses its internals to
 /// implement a line-buffered writer (specifically by using the internal
-/// methods like `write_to_buf` and `flush_buf`). In this way, a more
-/// efficient abstraction can be created than one that only had access to
-/// `write` and `flush`, without needlessly duplicating a lot of the
-/// implementation details of `BufInteractor`. This also allows existing
-/// `BufInteractor`s to be temporarily given line-buffering logic; this is what
-/// enables Stdout to be alternately in line-buffered or block-buffered mode.
+/// methods like `write_to_buf` and `flush_buf`). In this way, a more efficient
+/// abstraction can be created than one that only had access to `write` and
+/// `flush`, without needlessly duplicating a lot of the implementation details
+/// of `BufDuplexer`. This also allows existing `BufDuplexer`s to be
+/// temporarily given line-buffering logic; this is what enables Stdout to be
+/// alternately in line-buffered or block-buffered mode.
 #[derive(Debug)]
-pub(super) struct BufReaderLineWriterShim<'a, Inter: Interact> {
-    buffer: &'a mut BufInteractorBackend<Inter>,
+pub(super) struct BufReaderLineWriterShim<'a, Inner: HalfDuplex> {
+    buffer: &'a mut BufDuplexerBackend<Inner>,
 }
 
-impl<'a, Inter: Interact> BufReaderLineWriterShim<'a, Inter> {
+impl<'a, Inner: HalfDuplex> BufReaderLineWriterShim<'a, Inner> {
     #[inline]
-    pub fn new(buffer: &'a mut BufInteractorBackend<Inter>) -> Self {
+    pub fn new(buffer: &'a mut BufDuplexerBackend<Inner>) -> Self {
         Self { buffer }
     }
 
     /// Get a mutable reference to the inner writer (that is, the writer
-    /// wrapped by the `BufInteractor`). Be careful with this writer, as writes to
+    /// wrapped by the `BufDuplexer`). Be careful with this writer, as writes to
     /// it will bypass the buffer.
     #[inline]
-    fn inner_mut(&mut self) -> &mut Inter {
+    fn inner_mut(&mut self) -> &mut Inner {
         self.buffer.get_mut()
     }
 
@@ -50,7 +50,7 @@ impl<'a, Inter: Interact> BufReaderLineWriterShim<'a, Inter> {
     }
 }
 
-impl<'a, Inter: Interact> Write for BufReaderLineWriterShim<'a, Inter> {
+impl<'a, Inner: HalfDuplex> Write for BufReaderLineWriterShim<'a, Inner> {
     /// Write some data into this `BufReaderLineWriterShim` with line buffering. This means
     /// that, if any newlines are present in the data, the data up to the last
     /// newline is sent directly to the underlying writer, and data after it
@@ -91,7 +91,7 @@ impl<'a, Inter: Interact> Write for BufReaderLineWriterShim<'a, Inter> {
 
         // Write `lines` directly to the inner writer. In keeping with the
         // `write` convention, make at most one attempt to add new (unbuffered)
-        // data. Because this write doesn't touch the `BufInteractor` state directly,
+        // data. Because this write doesn't touch the `BufDuplexer` state directly,
         // and the buffer is known to be empty, we don't need to worry about
         // self.buffer.panicked here.
         let flushed = self.inner_mut().write(lines)?;
@@ -204,7 +204,7 @@ impl<'a, Inter: Interact> Write for BufReaderLineWriterShim<'a, Inter> {
 
         // Write `lines` directly to the inner writer. In keeping with the
         // `write` convention, make at most one attempt to add new (unbuffered)
-        // data. Because this write doesn't touch the `BufInteractor` state directly,
+        // data. Because this write doesn't touch the `BufDuplexer` state directly,
         // and the buffer is known to be empty, we don't need to worry about
         // self.panicked here.
         let flushed = self.inner_mut().write_vectored(lines)?;

@@ -8,13 +8,13 @@
 //!
 //! [`bufreaderwriter`]: https://crates.io/crates/bufreaderwriter
 
-mod buf_interactor;
+mod buf_duplexer;
 mod buf_reader_line_writer;
 mod buf_reader_line_writer_shim;
 
 use std::{error, fmt, io::Error};
 
-pub use buf_interactor::BufInteractor;
+pub use buf_duplexer::BufDuplexer;
 pub use buf_reader_line_writer::BufReaderLineWriter;
 use buf_reader_line_writer_shim::BufReaderLineWriterShim;
 

@@ -2,7 +2,9 @@
 //! f7801d6c7cc19ab22bdebcc8efa894a564c53469.
 
 use super::{IntoInnerError, DEFAULT_BUF_SIZE};
-use interact_trait::Interact;
+use duplex::{Duplex, HalfDuplex};
+#[cfg(feature = "io-ext")]
+use io_ext::{default_suggested_buffer_size, Bufferable, HalfDuplexExt};
 #[cfg(read_initializer)]
 use std::io::Initializer;
 use std::{
@@ -10,47 +12,42 @@ use std::{
     io::{self, BufRead, Error, ErrorKind, IoSlice, IoSliceMut, Read, Write},
 };
 use unsafe_io::{AsUnsafeHandle, UnsafeHandle};
-#[cfg(feature = "io-ext")]
-use {
-    interact_trait::InteractExt,
-    io_ext::{default_suggested_buffer_size, Bufferable},
-};
 
 /// Wraps a reader and writer and buffers their output.
 ///
 /// It can be excessively inefficient to work directly with something that
 /// implements [`Write`]. For example, every call to
 /// [`write`][`TcpStream::write`] on [`TcpStream`] results in a system call. A
-/// `BufInteractor<Inter>` keeps an in-memory buffer of data and writes it to an
+/// `BufDuplexer<Inner>` keeps an in-memory buffer of data and writes it to an
 /// underlying writer in large, infrequent batches.
 ///
 /// It can be excessively inefficient to work directly with a [`Read`] instance.
 /// For example, every call to [`read`][`TcpStream::read`] on [`TcpStream`]
-/// results in a system call. A `BufInteractor<Inter>` performs large, infrequent
+/// results in a system call. A `BufDuplexer<Inner>` performs large, infrequent
 /// reads on the underlying [`Read`] and maintains an in-memory buffer of the results.
 ///
-/// `BufInteractor<Inter>` can improve the speed of programs that make *small* and
+/// `BufDuplexer<Inner>` can improve the speed of programs that make *small* and
 /// *repeated* write calls to the same file or network socket. It does not
 /// help when writing very large amounts at once, or writing just one or a few
 /// times. It also provides no advantage when writing to a destination that is
 /// in memory, like a [`Vec`]`<u8>`.
 ///
-/// `BufInteractor<Inter>` can improve the speed of programs that make *small* and
+/// `BufDuplexer<Inner>` can improve the speed of programs that make *small* and
 /// *repeated* read calls to the same file or network socket. It does not
 /// help when reading very large amounts at once, or reading just one or a few
 /// times. It also provides no advantage when reading from a source that is
 /// already in memory, like a [`Vec`]`<u8>`.
 ///
-/// It is critical to call [`flush`] before `BufInteractor<Inter>` is dropped. Though
+/// It is critical to call [`flush`] before `BufDuplexer<Inner>` is dropped. Though
 /// dropping will attempt to flush the contents of the writer buffer, any errors
 /// that happen in the process of dropping will be ignored. Calling [`flush`]
 /// ensures that the writer buffer is empty and thus dropping will not even attempt
 /// file operations.
 ///
-/// When the `BufInteractor<Inter>` is dropped, the contents of its reader buffer will be
-/// discarded. Creating multiple instances of a `BufInteractor<Inter>` on the same
+/// When the `BufDuplexer<Inner>` is dropped, the contents of its reader buffer will be
+/// discarded. Creating multiple instances of a `BufDuplexer<Inner>` on the same
 /// stream can cause data loss. Reading from the underlying reader after
-/// unwrapping the `BufInteractor<Inter>` with [`BufInteractor::into_inner`] can also cause
+/// unwrapping the `BufDuplexer<Inner>` with [`BufDuplexer::into_inner`] can also cause
 /// data loss.
 ///
 /// # Examples
@@ -69,13 +66,13 @@ use {
 ///
 /// Because we're not buffering, we write each one in turn, incurring the
 /// overhead of a system call per byte written. We can fix this with a
-/// `BufInteractor<Inter>`:
+/// `BufDuplexer<Inner>`:
 ///
 /// ```no_run
-/// use io_streams::BufInteractor;
+/// use io_streams::BufDuplexer;
 /// use std::{io::prelude::*, net::TcpStream};
 ///
-/// let mut stream = BufInteractor::new(TcpStream::connect("127.0.0.1:34254").unwrap());
+/// let mut stream = BufDuplexer::new(TcpStream::connect("127.0.0.1:34254").unwrap());
 ///
 /// for i in 0..10 {
 ///     stream.write(&[i + 1]).unwrap();
@@ -83,16 +80,16 @@ use {
 /// stream.flush().unwrap();
 /// ```
 ///
-/// By wrapping the stream with a `BufInteractor<Inter>`, these ten writes are all grouped
+/// By wrapping the stream with a `BufDuplexer<Inner>`, these ten writes are all grouped
 /// together by the buffer and will all be written out in one system call when
 /// the `stream` is flushed.
 ///
 /// ```no_run
-/// use io_streams::BufInteractor;
+/// use io_streams::BufDuplexer;
 /// use std::{io::prelude::*, net::TcpStream};
 ///
 /// fn main() -> std::io::Result<()> {
-///     let mut stream = BufInteractor::new(TcpStream::connect("127.0.0.1:34254").unwrap());
+///     let mut stream = BufDuplexer::new(TcpStream::connect("127.0.0.1:34254").unwrap());
 ///
 ///     let mut line = String::new();
 ///     let len = stream.read_line(&mut line)?;
@@ -105,17 +102,17 @@ use {
 /// [`TcpStream::write`]: std::io::Write::write
 /// [`TcpStream`]: std::net::TcpStream
 /// [`flush`]: std::io::Write::flush
-pub struct BufInteractor<Inter: Interact> {
-    inner: BufInteractorBackend<Inter>,
+pub struct BufDuplexer<Inner: HalfDuplex> {
+    inner: BufDuplexerBackend<Inner>,
 }
 
-pub(crate) struct BufInteractorBackend<Inter: Interact> {
-    inner: Option<Inter>,
+pub(crate) struct BufDuplexerBackend<Inner: HalfDuplex> {
+    inner: Option<Inner>,
 
     // writer fields
     writer_buf: Vec<u8>,
     // #30888: If the inner writer panics in a call to write, we don't want to
-    // write the buffered data a second time in BufInteractor's destructor. This
+    // write the buffered data a second time in BufDuplexer's destructor. This
     // flag tells the Drop impl if it should skip the flush.
     panicked: bool,
 
@@ -125,42 +122,42 @@ pub(crate) struct BufInteractorBackend<Inter: Interact> {
     cap: usize,
 }
 
-impl<Inter: Interact> BufInteractor<Inter> {
-    /// Creates a new `BufInteractor<Inter>` with default buffer capacities. The default is currently 8 KB,
+impl<Inner: HalfDuplex> BufDuplexer<Inner> {
+    /// Creates a new `BufDuplexer<Inner>` with default buffer capacities. The default is currently 8 KB,
     /// but may change in the future.
     ///
     /// # Examples
     ///
     /// ```no_run
-    /// use io_streams::BufInteractor;
+    /// use io_streams::BufDuplexer;
     /// use std::net::TcpStream;
     ///
-    /// let mut buffer = BufInteractor::new(TcpStream::connect("127.0.0.1:34254").unwrap());
+    /// let mut buffer = BufDuplexer::new(TcpStream::connect("127.0.0.1:34254").unwrap());
     /// ```
     #[inline]
-    pub fn new(inner: Inter) -> Self {
+    pub fn new(inner: Inner) -> Self {
         Self {
-            inner: BufInteractorBackend::new(inner),
+            inner: BufDuplexerBackend::new(inner),
         }
     }
 
-    /// Creates a new `BufInteractor<Inter>` with the specified buffer capacities.
+    /// Creates a new `BufDuplexer<Inner>` with the specified buffer capacities.
     ///
     /// # Examples
     ///
     /// Creating a buffer with ten bytes of reader capacity and a writer buffer of a hundered bytes:
     ///
     /// ```no_run
-    /// use io_streams::BufInteractor;
+    /// use io_streams::BufDuplexer;
     /// use std::net::TcpStream;
     ///
     /// let stream = TcpStream::connect("127.0.0.1:34254").unwrap();
-    /// let mut buffer = BufInteractor::with_capacities(10, 100, stream);
+    /// let mut buffer = BufDuplexer::with_capacities(10, 100, stream);
     /// ```
     #[inline]
-    pub fn with_capacities(reader_capacity: usize, writer_capacity: usize, inner: Inter) -> Self {
+    pub fn with_capacities(reader_capacity: usize, writer_capacity: usize, inner: Inner) -> Self {
         Self {
-            inner: BufInteractorBackend::with_capacities(reader_capacity, writer_capacity, inner),
+            inner: BufDuplexerBackend::with_capacities(reader_capacity, writer_capacity, inner),
         }
     }
 
@@ -169,16 +166,16 @@ impl<Inter: Interact> BufInteractor<Inter> {
     /// # Examples
     ///
     /// ```no_run
-    /// use io_streams::BufInteractor;
+    /// use io_streams::BufDuplexer;
     /// use std::net::TcpStream;
     ///
-    /// let mut buffer = BufInteractor::new(TcpStream::connect("127.0.0.1:34254").unwrap());
+    /// let mut buffer = BufDuplexer::new(TcpStream::connect("127.0.0.1:34254").unwrap());
     ///
     /// // we can use reference just like buffer
     /// let reference = buffer.get_ref();
     /// ```
     #[inline]
-    pub fn get_ref(&self) -> &Inter {
+    pub fn get_ref(&self) -> &Inner {
         self.inner.get_ref()
     }
 
@@ -189,16 +186,16 @@ impl<Inter: Interact> BufInteractor<Inter> {
     /// # Examples
     ///
     /// ```no_run
-    /// use io_streams::BufInteractor;
+    /// use io_streams::BufDuplexer;
     /// use std::net::TcpStream;
     ///
-    /// let mut buffer = BufInteractor::new(TcpStream::connect("127.0.0.1:34254").unwrap());
+    /// let mut buffer = BufDuplexer::new(TcpStream::connect("127.0.0.1:34254").unwrap());
     ///
     /// // we can use reference just like buffer
     /// let reference = buffer.get_mut();
     /// ```
     #[inline]
-    pub fn get_mut(&mut self) -> &mut Inter {
+    pub fn get_mut(&mut self) -> &mut Inner {
         self.inner.get_mut()
     }
 
@@ -207,10 +204,10 @@ impl<Inter: Interact> BufInteractor<Inter> {
     /// # Examples
     ///
     /// ```no_run
-    /// use io_streams::BufInteractor;
+    /// use io_streams::BufDuplexer;
     /// use std::net::TcpStream;
     ///
-    /// let buf_writer = BufInteractor::new(TcpStream::connect("127.0.0.1:34254").unwrap());
+    /// let buf_writer = BufDuplexer::new(TcpStream::connect("127.0.0.1:34254").unwrap());
     ///
     /// // See how many bytes are currently buffered
     /// let bytes_buffered = buf_writer.writer_buffer().len();
@@ -230,12 +227,12 @@ impl<Inter: Interact> BufInteractor<Inter> {
     ///
     /// ```no_run
     /// use char_device::CharDevice;
-    /// use io_streams::BufInteractor;
+    /// use io_streams::BufDuplexer;
     /// use std::{fs::File, io::BufRead};
     ///
     /// fn main() -> std::io::Result<()> {
     ///     let f = CharDevice::new(File::open("/dev/ttyS0")?)?;
-    ///     let mut reader = BufInteractor::new(f);
+    ///     let mut reader = BufDuplexer::new(f);
     ///     assert!(reader.reader_buffer().is_empty());
     ///
     ///     if reader.fill_buf()?.len() > 0 {
@@ -253,15 +250,15 @@ impl<Inter: Interact> BufInteractor<Inter> {
     /// # Examples
     ///
     /// ```no_run
-    /// use io_streams::BufInteractor;
+    /// use io_streams::BufDuplexer;
     /// use std::net::TcpStream;
     ///
-    /// let buf_interactor = BufInteractor::new(TcpStream::connect("127.0.0.1:34254").unwrap());
+    /// let buf_duplexer = BufDuplexer::new(TcpStream::connect("127.0.0.1:34254").unwrap());
     ///
     /// // Check the capacity of the inner buffer
-    /// let capacity = buf_interactor.writer_capacity();
+    /// let capacity = buf_duplexer.writer_capacity();
     /// // Calculate how many bytes can be written without flushing
-    /// let without_flush = capacity - buf_interactor.writer_buffer().len();
+    /// let without_flush = capacity - buf_duplexer.writer_buffer().len();
     /// ```
     #[inline]
     pub fn writer_capacity(&self) -> usize {
@@ -274,12 +271,12 @@ impl<Inter: Interact> BufInteractor<Inter> {
     ///
     /// ```no_run
     /// use char_device::CharDevice;
-    /// use io_streams::BufInteractor;
+    /// use io_streams::BufDuplexer;
     /// use std::{fs::File, io::BufRead};
     ///
     /// fn main() -> std::io::Result<()> {
     ///     let f = CharDevice::new(File::open("/dev/tty")?)?;
-    ///     let mut reader = BufInteractor::new(f);
+    ///     let mut reader = BufDuplexer::new(f);
     ///
     ///     let capacity = reader.reader_capacity();
     ///     let buffer = reader.fill_buf()?;
@@ -291,7 +288,7 @@ impl<Inter: Interact> BufInteractor<Inter> {
         self.inner.reader_capacity()
     }
 
-    /// Unwraps this `BufInteractor<Inter>`, returning the underlying reader/writer.
+    /// Unwraps this `BufDuplexer<Inner>`, returning the underlying reader/writer.
     ///
     /// The buffer is written out before returning the reader/writer.
     ///
@@ -302,27 +299,27 @@ impl<Inter: Interact> BufInteractor<Inter> {
     /// # Examples
     ///
     /// ```no_run
-    /// use io_streams::BufInteractor;
+    /// use io_streams::BufDuplexer;
     /// use std::net::TcpStream;
     ///
-    /// let mut buffer = BufInteractor::new(TcpStream::connect("127.0.0.1:34254").unwrap());
+    /// let mut buffer = BufDuplexer::new(TcpStream::connect("127.0.0.1:34254").unwrap());
     ///
     /// // unwrap the TcpStream and flush the buffer
     /// let stream = buffer.into_inner().unwrap();
     /// ```
-    pub fn into_inner(self) -> Result<Inter, IntoInnerError<Self>> {
+    pub fn into_inner(self) -> Result<Inner, IntoInnerError<Self>> {
         self.inner
             .into_inner()
             .map_err(|err| err.new_wrapped(|inner| Self { inner }))
     }
 }
 
-impl<Inter: Interact> BufInteractorBackend<Inter> {
-    pub fn new(inner: Inter) -> Self {
+impl<Inner: HalfDuplex> BufDuplexerBackend<Inner> {
+    pub fn new(inner: Inner) -> Self {
         Self::with_capacities(DEFAULT_BUF_SIZE, DEFAULT_BUF_SIZE, inner)
     }
 
-    pub fn with_capacities(reader_capacity: usize, writer_capacity: usize, inner: Inter) -> Self {
+    pub fn with_capacities(reader_capacity: usize, writer_capacity: usize, inner: Inner) -> Self {
         #[cfg(not(read_initializer))]
         let buffer = vec![0; reader_capacity];
 
@@ -422,12 +419,12 @@ impl<Inter: Interact> BufInteractorBackend<Inter> {
     }
 
     #[inline]
-    pub fn get_ref(&self) -> &Inter {
+    pub fn get_ref(&self) -> &Inner {
         self.inner.as_ref().unwrap()
     }
 
     #[inline]
-    pub fn get_mut(&mut self) -> &mut Inter {
+    pub fn get_mut(&mut self) -> &mut Inner {
         self.inner.as_mut().unwrap()
     }
 
@@ -449,7 +446,7 @@ impl<Inter: Interact> BufInteractorBackend<Inter> {
         self.reader_buf.len()
     }
 
-    pub fn into_inner(mut self) -> Result<Inter, IntoInnerError<Self>> {
+    pub fn into_inner(mut self) -> Result<Inner, IntoInnerError<Self>> {
         match self.flush_buf() {
             Err(e) => Err(IntoInnerError::new(self, e)),
             Ok(()) => Ok(self.inner.take().unwrap()),
@@ -464,7 +461,7 @@ impl<Inter: Interact> BufInteractorBackend<Inter> {
     }
 }
 
-impl<Inter: Interact> Write for BufInteractor<Inter> {
+impl<Inner: HalfDuplex> Write for BufDuplexer<Inner> {
     #[inline]
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         self.inner.write(buf)
@@ -492,7 +489,7 @@ impl<Inter: Interact> Write for BufInteractor<Inter> {
     }
 }
 
-impl<Inter: Interact> Write for BufInteractorBackend<Inter> {
+impl<Inner: HalfDuplex> Write for BufDuplexerBackend<Inner> {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         if self.writer_buf.len() + buf.len() > self.writer_buf.capacity() {
             self.flush_buf()?;
@@ -559,10 +556,10 @@ impl<Inter: Interact> Write for BufInteractorBackend<Inter> {
     }
 }
 
-impl<Inter: Interact> Read for BufInteractor<Inter> {
+impl<Inner: HalfDuplex> Read for BufDuplexer<Inner> {
     #[inline]
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        // Flush the writer half of this `BufInteractor` before reading.
+        // Flush the writer half of this `BufDuplexer` before reading.
         self.inner.flush()?;
 
         self.inner.read(buf)
@@ -570,7 +567,7 @@ impl<Inter: Interact> Read for BufInteractor<Inter> {
 
     #[inline]
     fn read_vectored(&mut self, bufs: &mut [IoSliceMut<'_>]) -> io::Result<usize> {
-        // Flush the writer half of this `BufInteractor` before reading.
+        // Flush the writer half of this `BufDuplexer` before reading.
         self.inner.flush()?;
 
         self.inner.read_vectored(bufs)
@@ -590,7 +587,7 @@ impl<Inter: Interact> Read for BufInteractor<Inter> {
     }
 }
 
-impl<Inter: Interact> Read for BufInteractorBackend<Inter> {
+impl<Inner: HalfDuplex> Read for BufDuplexerBackend<Inner> {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         if self.pos == self.cap && buf.len() >= self.reader_buf.len() {
             self.discard_reader_buffer();
@@ -630,7 +627,7 @@ impl<Inter: Interact> Read for BufInteractorBackend<Inter> {
     }
 }
 
-impl<Inter: Interact> BufRead for BufInteractor<Inter> {
+impl<Inner: HalfDuplex> BufRead for BufDuplexer<Inner> {
     #[inline]
     fn fill_buf(&mut self) -> io::Result<&[u8]> {
         self.inner.fill_buf()
@@ -643,7 +640,7 @@ impl<Inter: Interact> BufRead for BufInteractor<Inter> {
 
     #[inline]
     fn read_until(&mut self, byte: u8, buf: &mut Vec<u8>) -> io::Result<usize> {
-        // Flush the writer half of this `BufInteractor` before reading.
+        // Flush the writer half of this `BufDuplexer` before reading.
         self.inner.flush()?;
 
         self.inner.read_until(byte, buf)
@@ -651,7 +648,7 @@ impl<Inter: Interact> BufRead for BufInteractor<Inter> {
 
     #[inline]
     fn read_line(&mut self, buf: &mut String) -> io::Result<usize> {
-        // Flush the writer half of this `BufInteractor` before reading.
+        // Flush the writer half of this `BufDuplexer` before reading.
         self.inner.flush()?;
 
         self.inner.read_line(buf)
@@ -659,7 +656,7 @@ impl<Inter: Interact> BufRead for BufInteractor<Inter> {
 }
 
 // FIXME: impl read_line for BufRead explicitly?
-impl<Inter: Interact> BufRead for BufInteractorBackend<Inter> {
+impl<Inner: HalfDuplex> BufRead for BufDuplexerBackend<Inner> {
     fn fill_buf(&mut self) -> io::Result<&[u8]> {
         // If we've reached the end of our internal buffer then we need to fetch
         // some more data from the underlying reader.
@@ -678,21 +675,21 @@ impl<Inter: Interact> BufRead for BufInteractorBackend<Inter> {
     }
 }
 
-impl<Inter: Interact> fmt::Debug for BufInteractor<Inter>
+impl<Inner: HalfDuplex> fmt::Debug for BufDuplexer<Inner>
 where
-    Inter: fmt::Debug,
+    Inner: fmt::Debug,
 {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.inner.fmt(fmt)
     }
 }
 
-impl<Inter: Interact> fmt::Debug for BufInteractorBackend<Inter>
+impl<Inner: HalfDuplex> fmt::Debug for BufDuplexerBackend<Inner>
 where
-    Inter: fmt::Debug,
+    Inner: fmt::Debug,
 {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt.debug_struct("BufInteractor")
+        fmt.debug_struct("BufDuplexer")
             .field("inner", &self.inner.as_ref().unwrap())
             .field(
                 "reader_buffer",
@@ -706,7 +703,7 @@ where
     }
 }
 
-impl<Inter: Interact> Drop for BufInteractorBackend<Inter> {
+impl<Inner: HalfDuplex> Drop for BufDuplexerBackend<Inner> {
     fn drop(&mut self) {
         if self.inner.is_some() && !self.panicked {
             // dtors should not panic, so we ignore a failed flush
@@ -715,14 +712,14 @@ impl<Inter: Interact> Drop for BufInteractorBackend<Inter> {
     }
 }
 
-impl<Inter: Interact + AsUnsafeHandle> AsUnsafeHandle for BufInteractor<Inter> {
+impl<Inner: HalfDuplex + AsUnsafeHandle> AsUnsafeHandle for BufDuplexer<Inner> {
     #[inline]
     fn as_unsafe_handle(&self) -> UnsafeHandle {
         self.inner.as_unsafe_handle()
     }
 }
 
-impl<Inter: Interact + AsUnsafeHandle> AsUnsafeHandle for BufInteractorBackend<Inter> {
+impl<Inner: HalfDuplex + AsUnsafeHandle> AsUnsafeHandle for BufDuplexerBackend<Inner> {
     #[inline]
     fn as_unsafe_handle(&self) -> UnsafeHandle {
         self.inner.as_ref().unwrap().as_unsafe_handle()
@@ -730,20 +727,20 @@ impl<Inter: Interact + AsUnsafeHandle> AsUnsafeHandle for BufInteractorBackend<I
 }
 
 #[cfg(feature = "terminal-support")]
-impl<Inter: Interact + terminal_support::WriteTerminal> terminal_support::Terminal
-    for BufInteractor<Inter>
+impl<Inner: Duplex + Read + terminal_support::WriteTerminal> terminal_support::Terminal
+    for BufDuplexer<Inner>
 {
 }
 
 #[cfg(feature = "terminal-support")]
-impl<Inter: Interact + terminal_support::WriteTerminal> terminal_support::Terminal
-    for BufInteractorBackend<Inter>
+impl<Inner: Duplex + Read + terminal_support::WriteTerminal> terminal_support::Terminal
+    for BufDuplexerBackend<Inner>
 {
 }
 
 #[cfg(feature = "terminal-support")]
-impl<Inter: Interact + terminal_support::WriteTerminal> terminal_support::WriteTerminal
-    for BufInteractor<Inter>
+impl<Inner: Duplex + Read + terminal_support::WriteTerminal> terminal_support::WriteTerminal
+    for BufDuplexer<Inner>
 {
     #[inline]
     fn color_support(&self) -> terminal_support::TerminalColorSupport {
@@ -762,8 +759,8 @@ impl<Inter: Interact + terminal_support::WriteTerminal> terminal_support::WriteT
 }
 
 #[cfg(feature = "terminal-support")]
-impl<Inter: Interact + terminal_support::WriteTerminal> terminal_support::WriteTerminal
-    for BufInteractorBackend<Inter>
+impl<Inner: Duplex + Read + terminal_support::WriteTerminal> terminal_support::WriteTerminal
+    for BufDuplexerBackend<Inner>
 {
     #[inline]
     fn color_support(&self) -> terminal_support::TerminalColorSupport {
@@ -785,7 +782,7 @@ impl<Inter: Interact + terminal_support::WriteTerminal> terminal_support::WriteT
 }
 
 #[cfg(feature = "io-ext")]
-impl<Inter: InteractExt + Bufferable> Bufferable for BufInteractor<Inter> {
+impl<Inner: HalfDuplexExt + Bufferable> Bufferable for BufDuplexer<Inner> {
     #[inline]
     fn abandon(&mut self) {
         self.inner.abandon()
@@ -798,7 +795,7 @@ impl<Inter: InteractExt + Bufferable> Bufferable for BufInteractor<Inter> {
 }
 
 #[cfg(feature = "io-ext")]
-impl<Inter: InteractExt + Bufferable> Bufferable for BufInteractorBackend<Inter> {
+impl<Inner: HalfDuplexExt + Bufferable> Bufferable for BufDuplexerBackend<Inner> {
     #[inline]
     fn abandon(&mut self) {
         match &mut self.inner {

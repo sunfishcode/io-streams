@@ -8,8 +8,8 @@
 #[cfg(bench)]
 extern crate test;
 
-use interact_trait::Interact;
-use io_streams::{BufInteractor, BufReaderLineWriter};
+use duplex::Duplex;
+use io_streams::{BufDuplexer, BufReaderLineWriter};
 use std::{
     fmt::Arguments,
     io::{self, prelude::*, ErrorKind, IoSlice, IoSliceMut},
@@ -21,7 +21,7 @@ use std::{
 
 /// The tests in this file were written for read-only and write-only streams;
 /// `JustReader` and `JustWriter` minimally adapt read-only and write-only
-/// streams to implement `Interact`.
+/// streams to implement `Duplex`.
 #[derive(Debug)]
 struct JustReader<T: Read>(T);
 
@@ -98,7 +98,7 @@ impl<T: Read> Write for JustReader<T> {
     }
 }
 
-impl<T: Read> Interact for JustReader<T> {}
+impl<T: Read> Duplex for JustReader<T> {}
 
 #[derive(Debug)]
 struct JustWriter<T: Write>(T);
@@ -183,7 +183,7 @@ impl<T: Write> Write for JustWriter<T> {
     }
 }
 
-impl<T: Write> Interact for JustWriter<T> {}
+impl<T: Write> Duplex for JustWriter<T> {}
 
 /// A dummy reader intended at testing short-reads propagation.
 pub struct ShortReader {
@@ -216,7 +216,7 @@ impl Write for ShortReader {
 #[test]
 fn test_buffered_reader() {
     let inner: Vec<u8> = vec![5, 6, 7, 0, 1, 2, 3, 4];
-    let mut reader = BufInteractor::with_capacities(2, 2, JustReader(io::Cursor::new(inner)));
+    let mut reader = BufDuplexer::with_capacities(2, 2, JustReader(io::Cursor::new(inner)));
 
     let mut buf = [0, 0, 0];
     let nread = reader.read(&mut buf);
@@ -253,7 +253,7 @@ fn test_buffered_reader() {
 #[test]
 fn test_buffered_reader_invalidated_after_read() {
     let inner: Vec<u8> = vec![5, 6, 7, 0, 1, 2, 3, 4];
-    let mut reader = BufInteractor::with_capacities(3, 3, JustReader(io::Cursor::new(inner)));
+    let mut reader = BufDuplexer::with_capacities(3, 3, JustReader(io::Cursor::new(inner)));
 
     assert_eq!(reader.fill_buf().ok(), Some(&[5, 6, 7][..]));
     reader.consume(3);
@@ -266,7 +266,7 @@ fn test_buffered_reader_invalidated_after_read() {
 #[test]
 fn test_buffered_writer() {
     let inner = Vec::new();
-    let mut writer = BufInteractor::with_capacities(2, 2, JustWriter(io::Cursor::new(inner)));
+    let mut writer = BufDuplexer::with_capacities(2, 2, JustWriter(io::Cursor::new(inner)));
 
     writer.write(&[0, 1]).unwrap();
     assert_eq!(writer.writer_buffer(), []);
@@ -314,7 +314,7 @@ fn test_buffered_writer() {
 
 #[test]
 fn test_buffered_writer_inner_flushes() {
-    let mut w = BufInteractor::with_capacities(3, 3, JustWriter(io::Cursor::new(Vec::new())));
+    let mut w = BufDuplexer::with_capacities(3, 3, JustWriter(io::Cursor::new(Vec::new())));
     w.write(&[0, 1]).unwrap();
     assert_eq!(*w.get_ref().get_ref(), []);
     let w = w.into_inner().unwrap();
@@ -324,7 +324,7 @@ fn test_buffered_writer_inner_flushes() {
 #[test]
 fn test_read_until() {
     let inner: Vec<u8> = vec![0, 1, 2, 1, 0];
-    let mut reader = BufInteractor::with_capacities(2, 2, JustReader(io::Cursor::new(inner)));
+    let mut reader = BufDuplexer::with_capacities(2, 2, JustReader(io::Cursor::new(inner)));
     let mut v = Vec::new();
     reader.read_until(0, &mut v).unwrap();
     assert_eq!(v, [0]);
@@ -365,7 +365,7 @@ fn test_line_buffer() {
 #[test]
 fn test_read_line() {
     let in_buf: Vec<u8> = b"a\nb\nc".to_vec();
-    let mut reader = BufInteractor::with_capacities(2, 2, JustReader(io::Cursor::new(in_buf)));
+    let mut reader = BufDuplexer::with_capacities(2, 2, JustReader(io::Cursor::new(in_buf)));
     let mut s = String::new();
     reader.read_line(&mut s).unwrap();
     assert_eq!(s, "a\n");
@@ -383,7 +383,7 @@ fn test_read_line() {
 #[test]
 fn test_lines() {
     let in_buf: Vec<u8> = b"a\nb\nc".to_vec();
-    let reader = BufInteractor::with_capacities(2, 2, JustReader(io::Cursor::new(in_buf)));
+    let reader = BufDuplexer::with_capacities(2, 2, JustReader(io::Cursor::new(in_buf)));
     let mut it = reader.lines();
     assert_eq!(it.next().unwrap().unwrap(), "a".to_string());
     assert_eq!(it.next().unwrap().unwrap(), "b".to_string());
@@ -396,7 +396,7 @@ fn test_short_reads() {
     let inner = ShortReader {
         lengths: vec![0, 1, 2, 0, 1, 0],
     };
-    let mut reader = BufInteractor::new(JustReader(inner));
+    let mut reader = BufDuplexer::new(JustReader(inner));
     let mut buf = [0, 0];
     assert_eq!(reader.read(&mut buf).unwrap(), 0);
     assert_eq!(reader.read(&mut buf).unwrap(), 1);
@@ -429,7 +429,7 @@ fn dont_panic_in_drop_on_panicked_flush() {
     }
 
     let writer = FailFlushWriter;
-    let _writer = BufInteractor::new(JustWriter(writer));
+    let _writer = BufDuplexer::new(JustWriter(writer));
 
     // If writer panics *again* due to the flush error then the process will
     // abort.
@@ -461,7 +461,7 @@ fn panic_in_write_doesnt_flush_in_drop() {
     }
 
     thread::spawn(|| {
-        let mut writer = BufInteractor::new(JustWriter(PanicWriter));
+        let mut writer = BufDuplexer::new(JustWriter(PanicWriter));
         let _ = writer.write(b"hello world");
         let _ = writer.flush();
     })
@@ -492,7 +492,7 @@ impl Write for Empty {
 #[cfg(bench)]
 #[bench]
 fn bench_buffered_reader(b: &mut test::bench::Bencher) {
-    b.iter(|| BufInteractor::new(JustWriter(Empty)));
+    b.iter(|| BufDuplexer::new(JustWriter(Empty)));
 }
 
 struct Sink;
@@ -516,11 +516,11 @@ impl Write for Sink {
 #[cfg(bench)]
 #[bench]
 fn bench_buffered_writer(b: &mut test::bench::Bencher) {
-    b.iter(|| BufInteractor::new(JustWriter(Sink)));
+    b.iter(|| BufDuplexer::new(JustWriter(Sink)));
 }
 
 /// A simple `Write` target, designed to be wrapped by `BufReaderLineWriter` /
-/// `BufInteractor` / etc, that can have its `write` & `flush` behavior
+/// `BufDuplexer` / etc, that can have its `write` & `flush` behavior
 /// configured
 #[derive(Default, Clone)]
 struct ProgrammableSink {

@@ -1,11 +1,11 @@
 //! Unbuffered and unlocked I/O streams.
 //!
 //! For a starting point, see [`StreamReader`] and [`StreamWriter`] for input and
-//! output streams. There's also [`StreamInteractor`] for interactive streams.
+//! output streams. There's also [`StreamDuplexer`] for interactive streams.
 //!
 //! Since these types are unbuffered, it's advisable for most use cases to wrap
 //! them in buffering types such as [`std::io::BufReader`], [`std::io::BufWriter`],
-//! [`std::io::LineWriter`], [`BufInteractor`], or [`BufReaderLineWriter`].
+//! [`std::io::LineWriter`], [`BufDuplexer`], or [`BufReaderLineWriter`].
 //!
 //! [`BufReader`]: std::io::BufReader
 //! [`BufWriter`]: std::io::BufWriter
@@ -23,5 +23,5 @@ mod buffered;
 mod lockers;
 mod streams;
 
-pub use buffered::{BufInteractor, BufReaderLineWriter, IntoInnerError};
-pub use streams::{StreamInteractor, StreamReader, StreamWriter};
+pub use buffered::{BufDuplexer, BufReaderLineWriter, IntoInnerError};
+pub use streams::{StreamDuplexer, StreamReader, StreamWriter};

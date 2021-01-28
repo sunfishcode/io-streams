@@ -6,7 +6,7 @@ use io_streams::{StreamReader, StreamWriter};
 use std::io::{copy, Read, Write};
 #[cfg(all(not(target_os = "wasi"), feature = "socketpair"))]
 use {
-    io_streams::StreamInteractor,
+    io_streams::StreamDuplexer,
     socketpair::SocketpairStream,
     std::{io, str},
 };
@@ -134,7 +134,7 @@ fn test_null() -> anyhow::Result<()> {
 #[cfg(all(not(target_os = "wasi"), feature = "socketpair"))]
 #[test]
 fn test_socketpair() -> anyhow::Result<()> {
-    let mut thread = StreamInteractor::socketed_thread(Box::new(
+    let mut thread = StreamDuplexer::socketed_thread(Box::new(
         |mut stream: SocketpairStream| -> io::Result<SocketpairStream> {
             let mut buf = [0_u8; 4096];
             let n = stream.read(&mut buf)?;

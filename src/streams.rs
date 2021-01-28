@@ -1,7 +1,7 @@
 use crate::lockers::{StdinLocker, StdoutLocker};
 #[cfg(feature = "char-device")]
 use char_device::CharDevice;
-use interact_trait::Interact;
+use duplex::Duplex;
 #[cfg(all(not(target_os = "wasi"), feature = "socketpair"))]
 use socketpair::{socketpair_stream, SocketpairStream};
 #[cfg(unix)]
@@ -80,10 +80,10 @@ pub struct StreamWriter {
 /// `char_device` constructor for character device files.
 ///
 /// [`File`]: std::fs::File
-pub struct StreamInteractor {
+pub struct StreamDuplexer {
     read_handle: UnsafeReadable,
     write_handle: UnsafeWriteable,
-    resources: InteractResources,
+    resources: DuplexResources,
 }
 
 /// Additional resources that need to be held in order to keep the stream live.
@@ -123,7 +123,7 @@ enum WriteResources {
 }
 
 /// Additional resources that need to be held in order to keep the stream live.
-enum InteractResources {
+enum DuplexResources {
     #[cfg(not(target_os = "wasi"))] // WASI doesn't support pipes yet
     PipeReaderWriter((PipeReader, PipeWriter)),
     StdinStdout((StdinLocker, StdoutLocker)),
@@ -150,7 +150,7 @@ impl StreamReader {
     ///
     /// This acquires a [`std::io::StdinLock`] to prevent accesses to
     /// `std::io::Stdin` while this is live, and fails if a `StreamReader` or
-    /// `StreamInteractor` for standard input already exists.
+    /// `StreamDuplexer` for standard input already exists.
     ///
     /// [`std::io::stdin`]: https://doc.rust-lang.org/std/io/fn.stdin.html`
     /// [`std::io::StdinLock`]: https://doc.rust-lang.org/std/io/struct.StdinLock.html
@@ -319,8 +319,7 @@ impl StreamWriter {
     ///
     /// This acquires a [`std::io::StdoutLock`] (in a non-recursive way) to
     /// prevent accesses to `std::io::Stdout` while this is live, and fails if
-    /// a `StreamWriter` or `StreamInteractor` for standard output already
-    /// exists.
+    /// a `StreamWriter` or `StreamDuplexer` for standard output already exists.
     ///
     /// [`std::io::stdout`]: https://doc.rust-lang.org/std/io/fn.stdout.html`
     /// [`std::io::StdoutLock`]: https://doc.rust-lang.org/std/io/struct.StdoutLock.html
@@ -470,8 +469,8 @@ impl StreamWriter {
     }
 }
 
-impl StreamInteractor {
-    /// Interact with stdin and stdout, taking ownership of them.
+impl StreamDuplexer {
+    /// Duplex with stdin and stdout, taking ownership of them.
     ///
     /// Unlike [`std::io::stdin`] and [`std::io::stdout`], this `stdin_stdout`
     /// returns a stream which is unbuffered and unlocked.
@@ -479,7 +478,7 @@ impl StreamInteractor {
     /// This acquires a [`std::io::StdinLock`] and a [`std::io::StdoutLock`] to
     /// prevent accesses to `std::io::Stdin` and `std::io::Stdout` while this
     /// is live, and fails if a `StreamReader` for standard input, a
-    /// `StreamWriter` for standard output, or a `StreamInteractor` for standard
+    /// `StreamWriter` for standard output, or a `StreamDuplexer` for standard
     /// input and standard output already exist.
     ///
     /// [`std::io::stdin`]: https://doc.rust-lang.org/std/io/fn.stdin.html`
@@ -495,20 +494,20 @@ impl StreamInteractor {
         Ok(Self::two_handles(
             read,
             write,
-            InteractResources::StdinStdout((stdin_locker, stdout_locker)),
+            DuplexResources::StdinStdout((stdin_locker, stdout_locker)),
         ))
     }
 
-    /// Interact with an open character device, taking ownership of it.
+    /// Duplex with an open character device, taking ownership of it.
     #[cfg(feature = "char-device")]
     #[inline]
     #[must_use]
     pub fn char_device(char_device: CharDevice) -> Self {
         let handle = char_device.as_unsafe_handle();
-        Self::handle(handle, InteractResources::CharDevice(char_device))
+        Self::handle(handle, DuplexResources::CharDevice(char_device))
     }
 
-    /// Interact with an open TCP stream, taking ownership of it.
+    /// Duplex with an open TCP stream, taking ownership of it.
     ///
     /// This method can be passed a [`std::net::TcpStream`] or similar
     /// `TcpStream` types.
@@ -525,18 +524,18 @@ impl StreamInteractor {
         // Safety: We don't implement `From`/`Into` to allow the inner
         // `TcpStream` to be extracted, so we don't need to worry that
         // we're granting ambient authorities here.
-        Self::handle(handle, InteractResources::TcpStream(tcp_stream))
+        Self::handle(handle, DuplexResources::TcpStream(tcp_stream))
     }
 
-    /// Interact with an open Unix-domain stream, taking ownership of it.
+    /// Duplex with an open Unix-domain stream, taking ownership of it.
     #[cfg(unix)]
     #[must_use]
     pub fn unix_stream(unix_stream: UnixStream) -> Self {
         let handle = unix_stream.as_unsafe_handle();
-        Self::handle(handle, InteractResources::UnixStream(unix_stream))
+        Self::handle(handle, DuplexResources::UnixStream(unix_stream))
     }
 
-    /// Interact a pair of pipe streams, taking ownership of them.
+    /// Duplex with a pair of pipe streams, taking ownership of them.
     #[cfg(not(target_os = "wasi"))] // WASI doesn't support pipes yet
     #[inline]
     #[must_use]
@@ -546,22 +545,21 @@ impl StreamInteractor {
         Self::two_handles(
             read,
             write,
-            InteractResources::PipeReaderWriter((pipe_reader, pipe_writer)),
+            DuplexResources::PipeReaderWriter((pipe_reader, pipe_writer)),
         )
     }
 
-    /// Interact with one end of a socketpair stream, taking ownership of it.
+    /// Duplex with one end of a socketpair stream, taking ownership of it.
     #[cfg(all(not(target_os = "wasi"), feature = "socketpair"))]
     #[must_use]
     pub fn socketpair_stream(stream: SocketpairStream) -> Self {
         let handle = stream.as_unsafe_handle();
-        Self::handle(handle, InteractResources::SocketpairStream(stream))
+        Self::handle(handle, DuplexResources::SocketpairStream(stream))
     }
 
-    /// Spawn the given command and interact with its standard input and
-    /// output.
+    /// Spawn the given command and duplex with its standard input and output.
     #[cfg(not(target_os = "wasi"))] // WASI doesn't support pipes yet
-    pub fn interact_with_command(mut command: Command) -> io::Result<Self> {
+    pub fn duplex_with_command(mut command: Command) -> io::Result<Self> {
         command.stdin(Stdio::piped());
         command.stdout(Stdio::piped());
         let child = command.spawn()?;
@@ -570,11 +568,11 @@ impl StreamInteractor {
         Ok(Self::two_handles(
             read,
             write,
-            InteractResources::Child(child),
+            DuplexResources::Child(child),
         ))
     }
 
-    /// Interact with a child process' stdout and stdin, taking ownership of
+    /// Duplex with a child process' stdout and stdin, taking ownership of
     /// them.
     #[cfg(not(target_os = "wasi"))] // WASI doesn't support pipes yet
     #[inline]
@@ -585,11 +583,11 @@ impl StreamInteractor {
         Self::two_handles(
             read,
             write,
-            InteractResources::ChildStdoutStdin((child_stdout, child_stdin)),
+            DuplexResources::ChildStdoutStdin((child_stdout, child_stdin)),
         )
     }
 
-    /// Interact with function running on another thread through a socketpair.
+    /// Duplex with function running on another thread through a socketpair.
     ///
     /// A socketpair is created, new thread is created, `func` is called in the
     /// new thread and passed one of the ends of the socketstream.
@@ -605,18 +603,18 @@ impl StreamInteractor {
     ) -> io::Result<Self> {
         let (a, b) = socketpair_stream()?;
         let join_handle = thread::Builder::new()
-            .name("socketed thread for boxed interactor".to_owned())
+            .name("socketed thread for boxed duplexer".to_owned())
             .spawn(move || func(a))?;
         let handle = b.as_unsafe_handle();
         Ok(Self::handle(
             handle,
-            InteractResources::SocketedThread(Some((b, join_handle))),
+            DuplexResources::SocketedThread(Some((b, join_handle))),
         ))
     }
 
     #[inline]
     #[must_use]
-    fn handle(handle: UnsafeHandle, resources: InteractResources) -> Self {
+    fn handle(handle: UnsafeHandle, resources: DuplexResources) -> Self {
         Self {
             read_handle: unsafe { handle.as_readable() },
             write_handle: unsafe { handle.as_writeable() },
@@ -626,7 +624,7 @@ impl StreamInteractor {
 
     #[inline]
     #[must_use]
-    fn two_handles(read: UnsafeHandle, write: UnsafeHandle, resources: InteractResources) -> Self {
+    fn two_handles(read: UnsafeHandle, write: UnsafeHandle, resources: DuplexResources) -> Self {
         Self {
             read_handle: unsafe { read.as_readable() },
             write_handle: unsafe { write.as_writeable() },
@@ -797,7 +795,7 @@ impl Write for StreamWriter {
     }
 }
 
-impl Read for StreamInteractor {
+impl Read for StreamDuplexer {
     #[inline]
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         match self.read_handle.read(buf) {
@@ -845,16 +843,16 @@ impl Read for StreamInteractor {
     }
 }
 
-impl Peek for StreamInteractor {
+impl Peek for StreamDuplexer {
     fn peek(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         match &mut self.resources {
-            InteractResources::TcpStream(tcp_stream) => Peek::peek(tcp_stream, buf),
+            DuplexResources::TcpStream(tcp_stream) => Peek::peek(tcp_stream, buf),
             #[cfg(unix)]
-            InteractResources::UnixStream(unix_stream) => Peek::peek(unix_stream, buf),
+            DuplexResources::UnixStream(unix_stream) => Peek::peek(unix_stream, buf),
             #[cfg(all(not(target_os = "wasi"), feature = "socketpair"))]
-            InteractResources::SocketpairStream(socketpair) => Peek::peek(socketpair, buf),
+            DuplexResources::SocketpairStream(socketpair) => Peek::peek(socketpair, buf),
             #[cfg(all(not(target_os = "wasi"), feature = "socketpair"))]
-            InteractResources::SocketedThread(socketed_thread) => {
+            DuplexResources::SocketedThread(socketed_thread) => {
                 Peek::peek(&mut socketed_thread.as_mut().unwrap().0, buf)
             }
             _ => Ok(0),
@@ -862,40 +860,40 @@ impl Peek for StreamInteractor {
     }
 }
 
-impl ReadReady for StreamInteractor {
+impl ReadReady for StreamDuplexer {
     fn num_ready_bytes(&self) -> io::Result<u64> {
         match &self.resources {
             #[cfg(not(target_os = "wasi"))]
-            InteractResources::PipeReaderWriter((pipe_reader, _)) => {
+            DuplexResources::PipeReaderWriter((pipe_reader, _)) => {
                 ReadReady::num_ready_bytes(pipe_reader)
             }
-            InteractResources::StdinStdout((stdin, _)) => ReadReady::num_ready_bytes(stdin),
+            DuplexResources::StdinStdout((stdin, _)) => ReadReady::num_ready_bytes(stdin),
             #[cfg(not(target_os = "wasi"))]
-            InteractResources::Child(child) => {
+            DuplexResources::Child(child) => {
                 ReadReady::num_ready_bytes(child.stdout.as_ref().unwrap())
             }
             #[cfg(not(target_os = "wasi"))]
-            InteractResources::ChildStdoutStdin((child_stdout, _)) => {
+            DuplexResources::ChildStdoutStdin((child_stdout, _)) => {
                 ReadReady::num_ready_bytes(child_stdout)
             }
             #[cfg(feature = "char-device")]
-            InteractResources::CharDevice(char_device) => ReadReady::num_ready_bytes(char_device),
-            InteractResources::TcpStream(tcp_stream) => ReadReady::num_ready_bytes(tcp_stream),
+            DuplexResources::CharDevice(char_device) => ReadReady::num_ready_bytes(char_device),
+            DuplexResources::TcpStream(tcp_stream) => ReadReady::num_ready_bytes(tcp_stream),
             #[cfg(unix)]
-            InteractResources::UnixStream(unix_stream) => ReadReady::num_ready_bytes(unix_stream),
+            DuplexResources::UnixStream(unix_stream) => ReadReady::num_ready_bytes(unix_stream),
             #[cfg(all(not(target_os = "wasi"), feature = "socketpair"))]
-            InteractResources::SocketpairStream(socketpair_stream) => {
+            DuplexResources::SocketpairStream(socketpair_stream) => {
                 ReadReady::num_ready_bytes(socketpair_stream)
             }
             #[cfg(all(not(target_os = "wasi"), feature = "socketpair"))]
-            InteractResources::SocketedThread(socketed_thread) => {
+            DuplexResources::SocketedThread(socketed_thread) => {
                 ReadReady::num_ready_bytes(&socketed_thread.as_ref().unwrap().0)
             }
         }
     }
 }
 
-impl Write for StreamInteractor {
+impl Write for StreamDuplexer {
     #[inline]
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         match self.write_handle.write(buf) {
@@ -952,7 +950,7 @@ impl Write for StreamInteractor {
     }
 }
 
-impl Interact for StreamInteractor {}
+impl Duplex for StreamDuplexer {}
 
 #[cfg(not(windows))]
 impl AsRawFd for StreamReader {
@@ -971,7 +969,7 @@ impl AsRawFd for StreamWriter {
 }
 
 #[cfg(not(windows))]
-impl AsRawReadWriteFd for StreamInteractor {
+impl AsRawReadWriteFd for StreamDuplexer {
     #[inline]
     fn as_raw_read_fd(&self) -> RawFd {
         self.read_handle.as_raw_fd()
@@ -1000,7 +998,7 @@ impl AsRawHandleOrSocket for StreamWriter {
 }
 
 #[cfg(windows)]
-impl AsRawReadWriteHandleOrSocket for StreamInteractor {
+impl AsRawReadWriteHandleOrSocket for StreamDuplexer {
     #[inline]
     fn as_raw_read_handle_or_socket(&self) -> RawHandleOrSocket {
         self.read_handle.as_raw_handle_or_socket()
@@ -1048,7 +1046,7 @@ impl Drop for WriteResources {
     }
 }
 
-impl Drop for InteractResources {
+impl Drop for DuplexResources {
     fn drop(&mut self) {
         match self {
             #[cfg(all(not(target_os = "wasi"), feature = "socketpair"))]
@@ -1085,12 +1083,12 @@ impl Debug for StreamWriter {
     }
 }
 
-impl Debug for StreamInteractor {
+impl Debug for StreamDuplexer {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         // Just print the fd numbers; don't try to print the path or any
         // information about it, because this information is otherwise
         // unavailable to safe Rust code.
-        f.debug_struct("StreamInteractor")
+        f.debug_struct("StreamDuplexer")
             .field("unsafe_readable", &self.as_unsafe_read_handle())
             .field("unsafe_writeable", &self.as_unsafe_write_handle())
             .finish()

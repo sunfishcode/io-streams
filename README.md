@@ -12,7 +12,7 @@
   </p>
 </div>
 
-This crate defines [`StreamReader`], [`StreamWriter`], and [`StreamInteractor`]
+This crate defines [`StreamReader`], [`StreamWriter`], and [`StreamDuplexer`]
 types which provide safe, owning, unbuffered, and unlocked access to a raw I/O
 stream, such as standard input, standard output, files, sockets, or pipes. It
 also supports a "piped thread" concept, where an arbitrary
@@ -28,7 +28,7 @@ contain an enum holding either `RawHandle` or `RawSocket`.
 
 Since these types are unbuffered, it's advisable for most use cases to wrap
 them in buffering types such as [`std::io::BufReader`], [`std::io::BufWriter`],
-[`std::io::LineWriter`], [`io_streams::BufInteractor`], or
+[`std::io::LineWriter`], [`io_streams::BufDuplexer`], or
 [`io_streams::BufReaderLineWriter`].
 
 Rust's [`std::io::Stdin`] and [`std::io::Stdout`] are always buffered, while
@@ -43,8 +43,8 @@ they are locked will block indefinitely.
 
 [`StreamReader`]: https://docs.rs/io-streams/latest/io_streams/struct.StreamReader.html
 [`StreamWriter`]: https://docs.rs/io-streams/latest/io_streams/struct.StreamWriter.html
-[`StreamInteractor`]: https://docs.rs/io-streams/latest/io_streams/struct.StreamInteractor.html
-[`io_streams::BufInteractor`]: https://docs.rs/io-streams/latest/io_streams/struct.BufInteractor.html
+[`StreamDuplexer`]: https://docs.rs/io-streams/latest/io_streams/struct.StreamDuplexer.html
+[`io_streams::BufDuplexer`]: https://docs.rs/io-streams/latest/io_streams/struct.BufDuplexer.html
 [`io_streams::BufReaderLineWriter`]: https://docs.rs/io-streams/latest/io_streams/struct.BufReaderLineWriter.html
 [`std::io::Stdin`]: https://doc.rust-lang.org/std/io/struct.Stdin.html
 [`std::io::Stdout`]: https://doc.rust-lang.org/std/io/struct.Stdout.html
