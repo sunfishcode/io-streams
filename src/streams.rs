@@ -152,9 +152,6 @@ impl StreamReader {
     /// This acquires a [`std::io::StdinLock`] to prevent accesses to
     /// `std::io::Stdin` while this is live, and fails if a `StreamReader` or
     /// `StreamDuplexer` for standard input already exists.
-    ///
-    /// [`std::io::stdin`]: https://doc.rust-lang.org/std/io/fn.stdin.html`
-    /// [`std::io::StdinLock`]: https://doc.rust-lang.org/std/io/struct.StdinLock.html
     #[inline]
     pub fn stdin() -> io::Result<Self> {
         let stdin_locker = StdinLocker::new()?;
@@ -321,9 +318,6 @@ impl StreamWriter {
     /// This acquires a [`std::io::StdoutLock`] (in a non-recursive way) to
     /// prevent accesses to `std::io::Stdout` while this is live, and fails if
     /// a `StreamWriter` or `StreamDuplexer` for standard output already exists.
-    ///
-    /// [`std::io::stdout`]: https://doc.rust-lang.org/std/io/fn.stdout.html`
-    /// [`std::io::StdoutLock`]: https://doc.rust-lang.org/std/io/struct.StdoutLock.html
     #[inline]
     pub fn stdout() -> io::Result<Self> {
         let stdout_locker = StdoutLocker::new()?;
@@ -477,15 +471,10 @@ impl StreamDuplexer {
     /// returns a stream which is unbuffered and unlocked.
     ///
     /// This acquires a [`std::io::StdinLock`] and a [`std::io::StdoutLock`] to
-    /// prevent accesses to `std::io::Stdin` and `std::io::Stdout` while this
-    /// is live, and fails if a `StreamReader` for standard input, a
+    /// prevent accesses to [`std::io::Stdin`] and [`std::io::Stdout`] while
+    /// this is live, and fails if a `StreamReader` for standard input, a
     /// `StreamWriter` for standard output, or a `StreamDuplexer` for standard
     /// input and standard output already exist.
-    ///
-    /// [`std::io::stdin`]: https://doc.rust-lang.org/std/io/fn.stdin.html`
-    /// [`std::io::stdout`]: https://doc.rust-lang.org/std/io/fn.stdout.html`
-    /// [`std::io::StdinLock`]: https://doc.rust-lang.org/std/io/struct.StdinLock.html
-    /// [`std::io::StdoutLock`]: https://doc.rust-lang.org/std/io/struct.StdoutLock.html
     #[inline]
     pub fn stdin_stdout() -> io::Result<Self> {
         let stdin_locker = StdinLocker::new()?;
