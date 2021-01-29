@@ -77,9 +77,10 @@ pub struct StreamWriter {
 ///
 /// There is no `file` constructor, even though [`File`] implements both `Read`
 /// and `Write`, because normal files are not interactive. However, there is a
-/// `char_device` constructor for character device files.
+/// `char_device` constructor for [character device files].
 ///
 /// [`File`]: std::fs::File
+/// [character device files]: https://docs.rs/char-device/latest/char_device/struct.CharDevice.html
 pub struct StreamDuplexer {
     read_handle: UnsafeReadable,
     write_handle: UnsafeWriteable,
