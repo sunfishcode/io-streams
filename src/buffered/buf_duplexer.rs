@@ -779,7 +779,7 @@ impl<Inner: HalfDuplex + terminal_io::WriteTerminal> terminal_io::WriteTerminal
 }
 
 #[cfg(feature = "layered-io")]
-impl<Inner: HalfDuplexLayered + Bufferable> Bufferable for BufDuplexer<Inner> {
+impl<Inner: HalfDuplexLayered> Bufferable for BufDuplexer<Inner> {
     #[inline]
     fn abandon(&mut self) {
         self.inner.abandon()
@@ -792,7 +792,7 @@ impl<Inner: HalfDuplexLayered + Bufferable> Bufferable for BufDuplexer<Inner> {
 }
 
 #[cfg(feature = "layered-io")]
-impl<Inner: HalfDuplexLayered + Bufferable> Bufferable for BufDuplexerBackend<Inner> {
+impl<Inner: HalfDuplexLayered> Bufferable for BufDuplexerBackend<Inner> {
     #[inline]
     fn abandon(&mut self) {
         match &mut self.inner {

@@ -523,7 +523,7 @@ impl<Inner: HalfDuplex + terminal_io::WriteTerminal> terminal_io::WriteTerminal
 }
 
 #[cfg(feature = "layered-io")]
-impl<Inner: HalfDuplexLayered + Bufferable> Bufferable for BufReaderLineWriter<Inner> {
+impl<Inner: HalfDuplexLayered> Bufferable for BufReaderLineWriter<Inner> {
     #[inline]
     fn abandon(&mut self) {
         self.inner.abandon()
@@ -536,7 +536,7 @@ impl<Inner: HalfDuplexLayered + Bufferable> Bufferable for BufReaderLineWriter<I
 }
 
 #[cfg(feature = "layered-io")]
-impl<Inner: HalfDuplexLayered + Bufferable> Bufferable for BufReaderLineWriterBackend<Inner> {
+impl<Inner: HalfDuplexLayered> Bufferable for BufReaderLineWriterBackend<Inner> {
     #[inline]
     fn abandon(&mut self) {
         self.inner.abandon()
