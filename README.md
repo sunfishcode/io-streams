@@ -7,7 +7,7 @@
 
   <p>
     <a href="https://github.com/sunfishcode/io-streams/actions?query=workflow%3ACI"><img src="https://github.com/sunfishcode/io-streams/workflows/CI/badge.svg" alt="Github Actions CI Status" /></a>
-    <a href="https://crates.io/crates/io_streams"><img src="https://img.shields.io/crates/v/io_streams.svg" alt="crates.io page" /></a>
+    <a href="https://crates.io/crates/io-streams"><img src="https://img.shields.io/crates/v/io-streams.svg" alt="crates.io page" /></a>
     <a href="https://docs.rs/io-streams"><img src="https://docs.rs/io-streams/badge.svg" alt="docs.rs docs" /></a>
   </p>
 </div>
