@@ -158,17 +158,23 @@ fn test_socketed_thread_func() -> anyhow::Result<()> {
     Ok(())
 }
 
-struct Mock();
+struct Mock(bool);
 
 impl Read for Mock {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        buf.copy_from_slice(&vec![0xab_u8; buf.len()]);
-        Ok(buf.len())
+        assert!(!self.0);
+        self.0 = true;
+        assert!(!buf.is_empty());
+        let len = buf.len() - 1;
+        buf[..len].copy_from_slice(&vec![0xab_u8; len]);
+        Ok(len)
     }
 }
 
 impl Write for Mock {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        assert!(self.0);
+        self.0 = false;
         assert_eq!(buf, &vec![0xcd_u8; buf.len()]);
         Ok(buf.len())
     }
@@ -178,12 +184,22 @@ impl Write for Mock {
     }
 }
 
+impl system_interface::io::ReadReady for Mock {
+    fn num_ready_bytes(&self) -> io::Result<u64> {
+        if self.0 {
+            Ok(0)
+        } else {
+            Ok(1)
+        }
+    }
+}
+
 impl duplex::Duplex for Mock {}
 
 #[cfg(all(not(target_os = "wasi"), feature = "socketpair"))]
 #[test]
 fn test_socketed_thread_read_first() -> anyhow::Result<()> {
-    let mut thread = StreamDuplexer::socketed_thread_read_first(Box::new(Mock()))?;
+    let mut thread = StreamDuplexer::socketed_thread_read_first(Box::new(Mock(false)))?;
 
     let mut buf = [0_u8; 4];
 
@@ -209,7 +225,7 @@ fn test_socketed_thread_read_first() -> anyhow::Result<()> {
 #[cfg(all(not(target_os = "wasi"), feature = "socketpair"))]
 #[test]
 fn test_socketed_thread_write_first() -> anyhow::Result<()> {
-    let mut thread = StreamDuplexer::socketed_thread_write_first(Box::new(Mock()))?;
+    let mut thread = StreamDuplexer::socketed_thread_write_first(Box::new(Mock(true)))?;
     let mut buf = [0_u8; 4];
 
     let n = thread.write(b"\xcd\xcd\xcd\xcd")?;
@@ -222,6 +238,57 @@ fn test_socketed_thread_write_first() -> anyhow::Result<()> {
 
     let n = thread.write(b"\xcd\xcd\xcd\xcd")?;
     assert_eq!(n, 4);
+    thread.flush()?;
+
+    let n = thread.read(&mut buf)?;
+    assert_eq!(n, 4);
+    assert_eq!(&buf, &[0xab_u8; 4]);
+
+    Ok(())
+}
+
+#[cfg(all(not(target_os = "wasi"), feature = "socketpair"))]
+#[test]
+fn test_socketed_thread_auto_read_first() -> anyhow::Result<()> {
+    let mut thread = StreamDuplexer::socketed_thread(Box::new(Mock(false)))?;
+
+    let mut buf = [0_u8; 4];
+
+    let n = thread.read(&mut buf)?;
+    assert_eq!(n, 4);
+    assert_eq!(&buf, &[0xab_u8; 4]);
+
+    let n = thread.write(b"\xcd\xcd\xcd\xcd")?;
+    assert_eq!(n, 4);
+    thread.flush()?;
+
+    let n = thread.read(&mut buf)?;
+    assert_eq!(n, 4);
+    assert_eq!(&buf, &[0xab_u8; 4]);
+
+    let n = thread.write(b"\xcd\xcd\xcd")?;
+    assert_eq!(n, 3);
+    thread.flush()?;
+
+    Ok(())
+}
+
+#[cfg(all(not(target_os = "wasi"), feature = "socketpair"))]
+#[test]
+fn test_socketed_thread_auto_write_first() -> anyhow::Result<()> {
+    let mut thread = StreamDuplexer::socketed_thread(Box::new(Mock(true)))?;
+    let mut buf = [0_u8; 4];
+
+    let n = thread.write(b"\xcd\xcd\xcd\xcd")?;
+    assert_eq!(n, 4);
+    thread.flush()?;
+
+    let n = thread.read(&mut buf)?;
+    assert_eq!(n, 4);
+    assert_eq!(&buf, &[0xab_u8; 4]);
+
+    let n = thread.write(b"\xcd\xcd\xcd")?;
+    assert_eq!(n, 3);
     thread.flush()?;
 
     let n = thread.read(&mut buf)?;

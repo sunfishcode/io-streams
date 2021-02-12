@@ -151,6 +151,13 @@ enum DuplexResources {
             JoinHandle<io::Result<Box<dyn HalfDuplex + Send>>>,
         )>,
     ),
+    #[cfg(all(not(target_os = "wasi"), feature = "socketpair"))]
+    SocketedThreadReadReady(
+        Option<(
+            SocketpairStream,
+            JoinHandle<io::Result<Box<dyn HalfDuplexReadReady + Send>>>,
+        )>,
+    ),
 }
 
 impl StreamReader {
@@ -601,39 +608,11 @@ impl StreamDuplexer {
     pub fn socketed_thread_read_first(
         mut boxed_duplex: Box<dyn HalfDuplex + Send>,
     ) -> io::Result<Self> {
-        let (mut a, b) = socketpair_stream()?;
+        let (a, b) = socketpair_stream()?;
         let join_handle = thread::Builder::new()
             .name("socketed thread for boxed duplexer".to_owned())
             .spawn(move || {
-                'thread: loop {
-                    let mut buf = vec![0_u8; crate::buffered::DEFAULT_BUF_SIZE];
-
-                    loop {
-                        let n = match (&mut *boxed_duplex).read(&mut buf) {
-                            Ok(0) => break 'thread,
-                            Ok(n) => n,
-                            Err(e) if e.kind() == io::ErrorKind::Interrupted => 0,
-                            Err(e) => return Err(e),
-                        };
-                        a.write_all(&buf[..n])?;
-                        if n < 4096 {
-                            break;
-                        }
-                    }
-
-                    loop {
-                        let n = match a.read(&mut buf) {
-                            Ok(0) => break 'thread,
-                            Ok(n) => n,
-                            Err(e) if e.kind() == io::ErrorKind::Interrupted => 0,
-                            Err(e) => return Err(e),
-                        };
-                        (&mut *boxed_duplex).write_all(&buf[..n])?;
-                        if n < 4096 {
-                            break;
-                        }
-                    }
-                }
+                read_first(a, &mut *boxed_duplex)?;
                 Ok(boxed_duplex)
             })?;
         let handle = b.as_unsafe_handle();
@@ -657,45 +636,62 @@ impl StreamDuplexer {
     pub fn socketed_thread_write_first(
         mut boxed_duplex: Box<dyn HalfDuplex + Send>,
     ) -> io::Result<Self> {
-        let (mut a, b) = socketpair_stream()?;
+        let (a, b) = socketpair_stream()?;
         let join_handle = thread::Builder::new()
             .name("socketed thread for boxed duplexer".to_owned())
             .spawn(move || {
-                'thread: loop {
-                    let mut buf = [0_u8; 4096];
-
-                    loop {
-                        let n = match a.read(&mut buf) {
-                            Ok(0) => break 'thread,
-                            Ok(n) => n,
-                            Err(e) if e.kind() == io::ErrorKind::Interrupted => 0,
-                            Err(e) => return Err(e),
-                        };
-                        boxed_duplex.write_all(&buf[..n])?;
-                        if n < 4096 {
-                            break;
-                        }
-                    }
-
-                    loop {
-                        let n = match boxed_duplex.read(&mut buf) {
-                            Ok(0) => break 'thread,
-                            Ok(n) => n,
-                            Err(e) if e.kind() == io::ErrorKind::Interrupted => 0,
-                            Err(e) => return Err(e),
-                        };
-                        a.write_all(&buf[..n])?;
-                        if n < 4096 {
-                            break;
-                        }
-                    }
-                }
+                write_first(a, &mut *boxed_duplex)?;
                 Ok(boxed_duplex)
             })?;
         let handle = b.as_unsafe_handle();
         Ok(Self::handle(
             handle,
             DuplexResources::SocketedThread(Some((b, join_handle))),
+        ))
+    }
+
+    /// Duplex with a duplexer from on another thread through a socketpair.
+    ///
+    /// A socketpair is created, new thread is created, `boxed_duplex` is
+    /// written to and/or read from over the socketpair.
+    /// `ReadReady::num_ready_bytes` is used to determine whether to read from
+    /// or write to `boxed_duplex` first. This may be inefficient, so if you
+    /// know which direction should go first, use `socketed_thread_read_first`
+    /// or `socketed_thread_write_first` instead.
+    ///
+    /// Writes to the pipe aren't synchronous with writes to the boxed `Write`
+    /// implementation. To ensure data is flushed all the way through the
+    /// thread and into the boxed `Write` implementation, call `flush()`, which
+    /// synchronizes with the thread to ensure that is has completed writing
+    /// all pending output.
+    #[cfg(all(not(target_os = "wasi"), feature = "socketpair"))]
+    pub fn socketed_thread(
+        mut boxed_duplex: Box<dyn HalfDuplexReadReady + Send>,
+    ) -> io::Result<Self> {
+        let (a, b) = socketpair_stream()?;
+        let join_handle = thread::Builder::new()
+            .name("socketed thread for boxed duplexer".to_owned())
+            .spawn(move || {
+                loop {
+                    if a.num_ready_bytes()? != 0 {
+                        write_first(a, &mut *boxed_duplex)?;
+                        break;
+                    }
+                    if boxed_duplex.num_ready_bytes()? != 0 {
+                        read_first(a, &mut *boxed_duplex)?;
+                        break;
+                    }
+
+                    // TODO: Implement a nicer way to wait for either of
+                    // the streams to be ready to read.
+                    std::thread::sleep(std::time::Duration::from_secs(1));
+                }
+                Ok(boxed_duplex)
+            })?;
+        let handle = b.as_unsafe_handle();
+        Ok(Self::handle(
+            handle,
+            DuplexResources::SocketedThreadReadReady(Some((b, join_handle))),
         ))
     }
 
@@ -967,6 +963,10 @@ impl Peek for StreamDuplexer {
             DuplexResources::SocketedThreadFunc(socketed_thread) => {
                 Peek::peek(&mut socketed_thread.as_mut().unwrap().0, buf)
             }
+            #[cfg(all(not(target_os = "wasi"), feature = "socketpair"))]
+            DuplexResources::SocketedThreadReadReady(socketed_thread) => {
+                Peek::peek(&mut socketed_thread.as_mut().unwrap().0, buf)
+            }
             _ => Ok(0),
         }
     }
@@ -1003,6 +1003,10 @@ impl ReadReady for StreamDuplexer {
             }
             #[cfg(all(not(target_os = "wasi"), feature = "socketpair"))]
             DuplexResources::SocketedThread(socketed_thread) => {
+                ReadReady::num_ready_bytes(&socketed_thread.as_ref().unwrap().0)
+            }
+            #[cfg(all(not(target_os = "wasi"), feature = "socketpair"))]
+            DuplexResources::SocketedThreadReadReady(socketed_thread) => {
                 ReadReady::num_ready_bytes(&socketed_thread.as_ref().unwrap().0)
             }
         }
@@ -1209,4 +1213,86 @@ impl Debug for StreamDuplexer {
             .field("unsafe_writeable", &self.as_unsafe_write_handle())
             .finish()
     }
+}
+
+/// A trait that combined `HalfDuplex` and `ReadReady`. Implemented via
+/// blanket implementation.
+#[cfg(all(not(target_os = "wasi"), feature = "socketpair"))]
+pub trait HalfDuplexReadReady: HalfDuplex + ReadReady {}
+
+#[cfg(all(not(target_os = "wasi"), feature = "socketpair"))]
+impl<T: HalfDuplex + ReadReady> HalfDuplexReadReady for T {}
+
+#[cfg(all(not(target_os = "wasi"), feature = "socketpair"))]
+fn read_first<T: HalfDuplex + ?Sized>(
+    mut a: SocketpairStream,
+    boxed_duplex: &mut T,
+) -> io::Result<()> {
+    'thread: loop {
+        let mut buf = vec![0_u8; crate::buffered::DEFAULT_BUF_SIZE];
+
+        loop {
+            let n = match boxed_duplex.read(&mut buf) {
+                Ok(0) => break 'thread,
+                Ok(n) => n,
+                Err(e) if e.kind() == io::ErrorKind::Interrupted => 0,
+                Err(e) => return Err(e),
+            };
+            a.write_all(&buf[..n])?;
+            if n < buf.len() {
+                break;
+            }
+        }
+
+        loop {
+            let n = match a.read(&mut buf) {
+                Ok(0) => break 'thread,
+                Ok(n) => n,
+                Err(e) if e.kind() == io::ErrorKind::Interrupted => 0,
+                Err(e) => return Err(e),
+            };
+            boxed_duplex.write_all(&buf[..n])?;
+            if n < buf.len() {
+                break;
+            }
+        }
+    }
+    Ok(())
+}
+
+#[cfg(all(not(target_os = "wasi"), feature = "socketpair"))]
+fn write_first<T: HalfDuplex + ?Sized>(
+    mut a: SocketpairStream,
+    boxed_duplex: &mut T,
+) -> io::Result<()> {
+    'thread: loop {
+        let mut buf = [0_u8; crate::buffered::DEFAULT_BUF_SIZE];
+
+        loop {
+            let n = match a.read(&mut buf) {
+                Ok(0) => break 'thread,
+                Ok(n) => n,
+                Err(e) if e.kind() == io::ErrorKind::Interrupted => 0,
+                Err(e) => return Err(e),
+            };
+            boxed_duplex.write_all(&buf[..n])?;
+            if n < buf.len() {
+                break;
+            }
+        }
+
+        loop {
+            let n = match boxed_duplex.read(&mut buf) {
+                Ok(0) => break 'thread,
+                Ok(n) => n,
+                Err(e) if e.kind() == io::ErrorKind::Interrupted => 0,
+                Err(e) => return Err(e),
+            };
+            a.write_all(&buf[..n])?;
+            if n < buf.len() {
+                break;
+            }
+        }
+    }
+    Ok(())
 }
