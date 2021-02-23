@@ -17,12 +17,14 @@ use std::{
 };
 use system_interface::io::{Peek, ReadReady};
 #[cfg(not(windows))]
-use unsafe_io::AsRawReadWriteFd;
+use unsafe_io::os::posish::AsRawReadWriteFd;
 #[cfg(windows)]
-use unsafe_io::{AsRawHandleOrSocket, AsRawReadWriteHandleOrSocket, RawHandleOrSocket};
+use unsafe_io::os::windows::{
+    AsRawHandleOrSocket, AsRawReadWriteHandleOrSocket, RawHandleOrSocket,
+};
 use unsafe_io::{
     AsUnsafeHandle, AsUnsafeReadWriteHandle, FromUnsafeFile, FromUnsafeSocket, IntoUnsafeFile,
-    IntoUnsafeSocket, UnsafeHandle, UnsafeReadable, UnsafeWriteable,
+    IntoUnsafeSocket, OwnsRaw, UnsafeHandle, UnsafeReadable, UnsafeWriteable,
 };
 #[cfg(all(not(target_os = "wasi"), feature = "socketpair"))]
 use {
@@ -49,7 +51,7 @@ use {
 /// Since it is unbuffered, and since many input sources have high per-call
 /// overhead, it is often beneficial to wrap this in a [`BufReader`].
 ///
-/// [`BufReader`]: https://doc.rust-lang.org/std/io/struct.BufReader.html
+/// [`BufReader`]: std::io::BufReader
 pub struct StreamReader {
     handle: UnsafeReadable,
     resources: ReadResources,
@@ -65,8 +67,8 @@ pub struct StreamReader {
 /// overhead, it is often beneficial to wrap this in a [`BufWriter`] or
 /// [`LineWriter`].
 ///
-/// [`BufWriter`]: https://doc.rust-lang.org/std/io/struct.BufWriter.html
-/// [`LineWriter`]: https://doc.rust-lang.org/std/io/struct.LineWriter.html
+/// [`BufWriter`]: std::io::BufWriter
+/// [`LineWriter`]: std::io::LineWriter
 pub struct StreamWriter {
     handle: UnsafeWriteable,
     resources: WriteResources,
@@ -334,7 +336,8 @@ impl StreamWriter {
     ///
     /// This acquires a [`std::io::StdoutLock`] (in a non-recursive way) to
     /// prevent accesses to `std::io::Stdout` while this is live, and fails if
-    /// a `StreamWriter` or `StreamDuplexer` for standard output already exists.
+    /// a `StreamWriter` or `StreamDuplexer` for standard output already
+    /// exists.
     #[inline]
     pub fn stdout() -> io::Result<Self> {
         let stdout_locker = StdoutLocker::new()?;
@@ -1130,6 +1133,15 @@ impl AsRawReadWriteHandleOrSocket for StreamDuplexer {
     }
 }
 
+// Safety: StreamReader owns its handle.
+unsafe impl OwnsRaw for StreamReader {}
+
+// Safety: StreamWriter owns its handle.
+unsafe impl OwnsRaw for StreamWriter {}
+
+// Safety: StreamDuplexer owns its handle.
+unsafe impl OwnsRaw for StreamDuplexer {}
+
 impl Drop for ReadResources {
     fn drop(&mut self) {
         match self {
@@ -1215,7 +1227,7 @@ impl Debug for StreamDuplexer {
     }
 }
 
-/// A trait that combined `HalfDuplex` and `ReadReady`. Implemented via
+/// A trait that combines [`HalfDuplex`] and [`ReadReady`]. Implemented via
 /// blanket implementation.
 #[cfg(all(not(target_os = "wasi"), feature = "socketpair"))]
 pub trait HalfDuplexReadReady: HalfDuplex + ReadReady {}

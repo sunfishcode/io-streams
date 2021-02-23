@@ -268,15 +268,15 @@ fn test_buffered_writer() {
     let inner = Vec::new();
     let mut writer = BufDuplexer::with_capacities(2, 2, JustWriter(io::Cursor::new(inner)));
 
-    writer.write(&[0, 1]).unwrap();
+    assert_eq!(writer.write(&[0, 1]).unwrap(), 2);
     assert_eq!(writer.writer_buffer(), []);
     assert_eq!(*writer.get_ref().get_ref(), [0, 1]);
 
-    writer.write(&[2]).unwrap();
+    assert_eq!(writer.write(&[2]).unwrap(), 1);
     assert_eq!(writer.writer_buffer(), [2]);
     assert_eq!(*writer.get_ref().get_ref(), [0, 1]);
 
-    writer.write(&[3]).unwrap();
+    assert_eq!(writer.write(&[3]).unwrap(), 1);
     assert_eq!(writer.writer_buffer(), [2, 3]);
     assert_eq!(*writer.get_ref().get_ref(), [0, 1]);
 
@@ -284,20 +284,20 @@ fn test_buffered_writer() {
     assert_eq!(writer.writer_buffer(), []);
     assert_eq!(*writer.get_ref().get_ref(), [0, 1, 2, 3]);
 
-    writer.write(&[4]).unwrap();
-    writer.write(&[5]).unwrap();
+    assert_eq!(writer.write(&[4]).unwrap(), 1);
+    assert_eq!(writer.write(&[5]).unwrap(), 1);
     assert_eq!(writer.writer_buffer(), [4, 5]);
     assert_eq!(*writer.get_ref().get_ref(), [0, 1, 2, 3]);
 
-    writer.write(&[6]).unwrap();
+    assert_eq!(writer.write(&[6]).unwrap(), 1);
     assert_eq!(writer.writer_buffer(), [6]);
     assert_eq!(*writer.get_ref().get_ref(), [0, 1, 2, 3, 4, 5]);
 
-    writer.write(&[7, 8]).unwrap();
+    assert_eq!(writer.write(&[7, 8]).unwrap(), 2);
     assert_eq!(writer.writer_buffer(), []);
     assert_eq!(*writer.get_ref().get_ref(), [0, 1, 2, 3, 4, 5, 6, 7, 8]);
 
-    writer.write(&[9, 10, 11]).unwrap();
+    assert_eq!(writer.write(&[9, 10, 11]).unwrap(), 3);
     assert_eq!(writer.writer_buffer(), []);
     assert_eq!(
         *writer.get_ref().get_ref(),
@@ -315,7 +315,7 @@ fn test_buffered_writer() {
 #[test]
 fn test_buffered_writer_inner_flushes() {
     let mut w = BufDuplexer::with_capacities(3, 3, JustWriter(io::Cursor::new(Vec::new())));
-    w.write(&[0, 1]).unwrap();
+    assert_eq!(w.write(&[0, 1]).unwrap(), 2);
     assert_eq!(*w.get_ref().get_ref(), []);
     let w = w.into_inner().unwrap();
     assert_eq!(w.get_ref(), &vec![0, 1]);
@@ -345,17 +345,17 @@ fn test_read_until() {
 #[test]
 fn test_line_buffer() {
     let mut writer = BufReaderLineWriter::new(JustWriter(io::Cursor::new(Vec::new())));
-    writer.write(&[0]).unwrap();
+    assert_eq!(writer.write(&[0]).unwrap(), 1);
     assert_eq!(*writer.get_ref().get_ref(), []);
-    writer.write(&[1]).unwrap();
+    assert_eq!(writer.write(&[1]).unwrap(), 1);
     assert_eq!(*writer.get_ref().get_ref(), []);
     writer.flush().unwrap();
     assert_eq!(*writer.get_ref().get_ref(), [0, 1]);
-    writer.write(&[0, b'\n', 1, b'\n', 2]).unwrap();
+    assert_eq!(writer.write(&[0, b'\n', 1, b'\n', 2]).unwrap(), 5);
     assert_eq!(*writer.get_ref().get_ref(), [0, 1, 0, b'\n', 1, b'\n']);
     writer.flush().unwrap();
     assert_eq!(*writer.get_ref().get_ref(), [0, 1, 0, b'\n', 1, b'\n', 2]);
-    writer.write(&[3, b'\n']).unwrap();
+    assert_eq!(writer.write(&[3, b'\n']).unwrap(), 2);
     assert_eq!(
         *writer.get_ref().get_ref(),
         [0, 1, 0, b'\n', 1, b'\n', 2, 3, b'\n']
@@ -739,8 +739,11 @@ fn line_vectored_partial_and_errors() {
 
     // partial writes keep going
     let mut a = BufReaderLineWriter::new(JustWriter(Writer::default()));
-    a.write_vectored(&[IoSlice::new(&[]), IoSlice::new(b"abc")])
-        .unwrap();
+    assert_eq!(
+        a.write_vectored(&[IoSlice::new(&[]), IoSlice::new(b"abc")])
+            .unwrap(),
+        3
+    );
 
     a.get_mut().calls.push_back(Call::Write {
         inputs: vec![b"abc"],
@@ -755,8 +758,11 @@ fn line_vectored_partial_and_errors() {
         output: Ok(2),
     });
 
-    a.write_vectored(&[IoSlice::new(b"x"), IoSlice::new(b"\n")])
-        .unwrap();
+    assert_eq!(
+        a.write_vectored(&[IoSlice::new(b"x"), IoSlice::new(b"\n")])
+            .unwrap(),
+        2
+    );
 
     a.get_mut().calls.push_back(Call::Flush { output: Ok(()) });
     a.flush().unwrap();

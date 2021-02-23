@@ -11,7 +11,14 @@ use std::{
     cmp, fmt,
     io::{self, BufRead, Error, ErrorKind, IoSlice, IoSliceMut, Read, Write},
 };
-use unsafe_io::{AsUnsafeHandle, UnsafeHandle};
+#[cfg(not(windows))]
+use unsafe_io::os::posish::{AsRawFd, RawFd};
+use unsafe_io::OwnsRaw;
+#[cfg(windows)]
+use {
+    std::os::windows::io::{AsRawHandle, AsRawSocket, RawHandle, RawSocket},
+    unsafe_io::os::windows::{AsRawHandleOrSocket, RawHandleOrSocket},
+};
 
 /// Wraps a reader and writer and buffers their output.
 ///
@@ -712,19 +719,75 @@ impl<Inner: HalfDuplex> Drop for BufDuplexerBackend<Inner> {
     }
 }
 
-impl<Inner: HalfDuplex + AsUnsafeHandle> AsUnsafeHandle for BufDuplexer<Inner> {
+#[cfg(not(windows))]
+impl<Inner: HalfDuplex + AsRawFd> AsRawFd for BufDuplexer<Inner> {
     #[inline]
-    fn as_unsafe_handle(&self) -> UnsafeHandle {
-        self.inner.as_unsafe_handle()
+    fn as_raw_fd(&self) -> RawFd {
+        self.inner.as_raw_fd()
     }
 }
 
-impl<Inner: HalfDuplex + AsUnsafeHandle> AsUnsafeHandle for BufDuplexerBackend<Inner> {
+#[cfg(windows)]
+impl<Inner: HalfDuplex + AsRawHandle> AsRawHandle for BufDuplexer<Inner> {
     #[inline]
-    fn as_unsafe_handle(&self) -> UnsafeHandle {
-        self.inner.as_ref().unwrap().as_unsafe_handle()
+    fn as_raw_handle(&self) -> RawHandle {
+        self.inner.as_raw_handle()
     }
 }
+
+#[cfg(windows)]
+impl<Inner: HalfDuplex + AsRawSocket> AsRawSocket for BufDuplexer<Inner> {
+    #[inline]
+    fn as_raw_socket(&self) -> RawSocket {
+        self.inner.as_raw_socket()
+    }
+}
+
+#[cfg(windows)]
+impl<Inner: HalfDuplex + AsRawHandleOrSocket> AsRawHandleOrSocket for BufDuplexer<Inner> {
+    #[inline]
+    fn as_raw_handle_or_socket(&self) -> RawHandleOrSocket {
+        self.inner.as_raw_handle_or_socket()
+    }
+}
+
+// Safety: `BufDuplexer` implements `OwnsRaw` if `Inner` does.
+unsafe impl<Inner: HalfDuplex + OwnsRaw> OwnsRaw for BufDuplexer<Inner> {}
+
+#[cfg(not(windows))]
+impl<Inner: HalfDuplex + AsRawFd> AsRawFd for BufDuplexerBackend<Inner> {
+    #[inline]
+    fn as_raw_fd(&self) -> RawFd {
+        self.inner.as_ref().unwrap().as_raw_fd()
+    }
+}
+
+#[cfg(windows)]
+impl<Inner: HalfDuplex + AsRawHandle> AsRawHandle for BufDuplexerBackend<Inner> {
+    #[inline]
+    fn as_raw_handle(&self) -> RawHandle {
+        self.inner.as_ref().unwrap().as_raw_handle()
+    }
+}
+
+#[cfg(windows)]
+impl<Inner: HalfDuplex + AsRawSocket> AsRawSocket for BufDuplexerBackend<Inner> {
+    #[inline]
+    fn as_raw_socket(&self) -> RawSocket {
+        self.inner.as_ref().unwrap().as_raw_socket()
+    }
+}
+
+#[cfg(windows)]
+impl<Inner: HalfDuplex + AsRawHandleOrSocket> AsRawHandleOrSocket for BufDuplexerBackend<Inner> {
+    #[inline]
+    fn as_raw_handle_or_socket(&self) -> RawHandleOrSocket {
+        self.inner.as_ref().unwrap().as_raw_handle_or_socket()
+    }
+}
+
+// Safety: `BufDuplexerBackend` implements `OwnsRaw` if `Inner` does.
+unsafe impl<Inner: HalfDuplex + OwnsRaw> OwnsRaw for BufDuplexerBackend<Inner> {}
 
 #[cfg(feature = "terminal-io")]
 impl<Inner: HalfDuplex + terminal_io::WriteTerminal> terminal_io::Terminal for BufDuplexer<Inner> {}

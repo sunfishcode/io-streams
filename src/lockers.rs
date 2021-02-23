@@ -12,11 +12,11 @@ use std::{
     thread::{self, JoinHandle},
 };
 use system_interface::io::ReadReady;
-use unsafe_io::AsUnsafeFile;
+use unsafe_io::{AsUnsafeFile, OwnsRaw};
 #[cfg(windows)]
 use {
     std::os::windows::io::{AsRawHandle, RawHandle},
-    unsafe_io::{AsRawHandleOrSocket, RawHandleOrSocket},
+    unsafe_io::os::windows::{AsRawHandleOrSocket, RawHandleOrSocket},
 };
 
 // Static handles to `stdin()` and `stdout()` so that we can reference
@@ -45,8 +45,8 @@ pub(crate) struct StdoutLocker {
 
 impl StdinLocker {
     /// An `InputByteStream` can take the value of the process' stdin, in which
-    /// case we want it to have exclusive access to `stdin`. Lock the Rust standard
-    /// library's `stdin` to prevent accidental misuse.
+    /// case we want it to have exclusive access to `stdin`. Lock the Rust
+    /// standard library's `stdin` to prevent accidental misuse.
     ///
     /// Fails if a `StdinLocker` instance already exists.
     pub(crate) fn new() -> io::Result<Self> {
@@ -79,9 +79,9 @@ impl StdinLocker {
 }
 
 impl StdoutLocker {
-    /// An `OutputByteStream` can take the value of the process' stdout, in which
-    /// case we want it to have exclusive access to `stdout`. Lock the Rust standard
-    /// library's `stdout` to prevent accidental misuse.
+    /// An `OutputByteStream` can take the value of the process' stdout, in
+    /// which case we want it to have exclusive access to `stdout`. Lock the
+    /// Rust standard library's `stdout` to prevent accidental misuse.
     ///
     /// Fails if a `StdoutLocker` instance already exists.
     pub(crate) fn new() -> io::Result<Self> {
@@ -178,6 +178,12 @@ impl AsRawHandleOrSocket for StdoutLocker {
         RawHandleOrSocket::from_raw_handle(STDOUT.as_raw_handle())
     }
 }
+
+// Safety: StdinLocker owns its file descriptor.
+unsafe impl OwnsRaw for StdinLocker {}
+
+// Safety: StdoutLocker owns its file descriptor.
+unsafe impl OwnsRaw for StdoutLocker {}
 
 impl ReadReady for StdinLocker {
     #[inline]

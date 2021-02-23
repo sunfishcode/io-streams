@@ -11,7 +11,14 @@ use std::{
     fmt,
     io::{self, BufRead, IoSlice, IoSliceMut, Read, Write},
 };
-use unsafe_io::{AsUnsafeHandle, UnsafeHandle};
+#[cfg(not(windows))]
+use unsafe_io::os::posish::{AsRawFd, RawFd};
+use unsafe_io::OwnsRaw;
+#[cfg(windows)]
+use {
+    std::os::windows::io::{AsRawHandle, AsRawSocket, RawHandle, RawSocket},
+    unsafe_io::os::windows::{AsRawHandleOrSocket, RawHandleOrSocket},
+};
 
 /// Wraps a reader and writer and buffers input and output to and from it, flushing
 /// the writer whenever a newline (`0x0a`, `'\n'`) is detected on output.
@@ -456,19 +463,77 @@ where
     }
 }
 
-impl<Inner: HalfDuplex + AsUnsafeHandle> AsUnsafeHandle for BufReaderLineWriter<Inner> {
+#[cfg(not(windows))]
+impl<Inner: HalfDuplex + AsRawFd> AsRawFd for BufReaderLineWriter<Inner> {
     #[inline]
-    fn as_unsafe_handle(&self) -> UnsafeHandle {
-        self.inner.as_unsafe_handle()
+    fn as_raw_fd(&self) -> RawFd {
+        self.inner.as_raw_fd()
     }
 }
 
-impl<Inner: HalfDuplex + AsUnsafeHandle> AsUnsafeHandle for BufReaderLineWriterBackend<Inner> {
+#[cfg(windows)]
+impl<Inner: HalfDuplex + AsRawHandle> AsRawHandle for BufReaderLineWriter<Inner> {
     #[inline]
-    fn as_unsafe_handle(&self) -> UnsafeHandle {
-        self.inner.as_unsafe_handle()
+    fn as_raw_handle(&self) -> RawHandle {
+        self.inner.as_raw_handle()
     }
 }
+
+#[cfg(windows)]
+impl<Inner: HalfDuplex + AsRawSocket> AsRawSocket for BufReaderLineWriter<Inner> {
+    #[inline]
+    fn as_raw_socket(&self) -> RawSocket {
+        self.inner.as_raw_socket()
+    }
+}
+
+#[cfg(windows)]
+impl<Inner: HalfDuplex + AsRawHandleOrSocket> AsRawHandleOrSocket for BufReaderLineWriter<Inner> {
+    #[inline]
+    fn as_raw_handle_or_socket(&self) -> RawHandleOrSocket {
+        self.inner.as_raw_handle_or_socket()
+    }
+}
+
+// Safety: `BufReaderLineWriter` implements `OwnsRaw` if `Inner` does.
+unsafe impl<Inner: HalfDuplex + OwnsRaw> OwnsRaw for BufReaderLineWriter<Inner> {}
+
+#[cfg(not(windows))]
+impl<Inner: HalfDuplex + AsRawFd> AsRawFd for BufReaderLineWriterBackend<Inner> {
+    #[inline]
+    fn as_raw_fd(&self) -> RawFd {
+        self.inner.as_raw_fd()
+    }
+}
+
+#[cfg(windows)]
+impl<Inner: HalfDuplex + AsRawHandle> AsRawHandle for BufReaderLineWriterBackend<Inner> {
+    #[inline]
+    fn as_raw_handle(&self) -> RawHandle {
+        self.inner.as_raw_handle()
+    }
+}
+
+#[cfg(windows)]
+impl<Inner: HalfDuplex + AsRawSocket> AsRawSocket for BufReaderLineWriterBackend<Inner> {
+    #[inline]
+    fn as_raw_socket(&self) -> RawSocket {
+        self.inner.as_raw_socket()
+    }
+}
+
+#[cfg(windows)]
+impl<Inner: HalfDuplex + AsRawHandleOrSocket> AsRawHandleOrSocket
+    for BufReaderLineWriterBackend<Inner>
+{
+    #[inline]
+    fn as_raw_handle_or_socket(&self) -> RawHandleOrSocket {
+        self.inner.as_raw_handle_or_socket()
+    }
+}
+
+// Safety: `BufReaderLineWriterBackend` implements `OwnsRaw` if `Inner` does.
+unsafe impl<Inner: HalfDuplex + OwnsRaw> OwnsRaw for BufReaderLineWriterBackend<Inner> {}
 
 #[cfg(feature = "terminal-io")]
 impl<Inner: HalfDuplex + terminal_io::Terminal> terminal_io::Terminal
