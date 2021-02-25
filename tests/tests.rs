@@ -7,7 +7,6 @@ use std::io::{self, copy, Read, Write};
 #[cfg(all(not(target_os = "wasi"), feature = "socketpair"))]
 use {io_streams::StreamDuplexer, socketpair::SocketpairStream, std::str};
 
-#[allow(unused)]
 fn tmpdir() -> TempDir {
     unsafe { tempdir() }.expect("expected to be able to create a temporary directory")
 }
