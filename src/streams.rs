@@ -168,13 +168,22 @@ impl StreamReader {
     /// Unlike [`std::io::stdin`], this `stdin` returns a stream which is
     /// unbuffered and unlocked.
     ///
-    /// This acquires a [`std::io::StdinLock`] to prevent accesses to
-    /// `std::io::Stdin` while this is live, and fails if a `StreamReader` or
-    /// `StreamDuplexer` for standard input already exists.
+    /// This acquires a [`std::io::StdinLock`] (in a non-recursive way) to
+    /// prevent accesses to `std::io::Stdin` while this is live, and fails if a
+    /// `StreamReader` or `StreamDuplexer` for standard input already exists.
     #[inline]
     pub fn stdin() -> io::Result<Self> {
         let stdin_locker = StdinLocker::new()?;
+
+        // Obtain stdin's handle.
+        #[cfg(not(windows))]
         let handle = stdin_locker.as_unsafe_handle();
+
+        // On Windows, stdin may be connected to a UTF-16 console, which
+        // `RawHandleOrSocket` can take care of for us.
+        #[cfg(windows)]
+        let handle = UnsafeHandle::unowned_from_raw_handle_or_socket(RawHandleOrSocket::stdin());
+
         Ok(Self::handle(handle, ReadResources::Stdin(stdin_locker)))
     }
 
@@ -341,7 +350,16 @@ impl StreamWriter {
     #[inline]
     pub fn stdout() -> io::Result<Self> {
         let stdout_locker = StdoutLocker::new()?;
+
+        // Obtain stdout's handle.
+        #[cfg(not(windows))]
         let handle = stdout_locker.as_unsafe_handle();
+
+        // On Windows, stdout may be connected to a UTF-16 console, which
+        // `RawHandleOrSocket` can take care of for us.
+        #[cfg(windows)]
+        let handle = UnsafeHandle::unowned_from_raw_handle_or_socket(RawHandleOrSocket::stdout());
+
         Ok(Self::handle(handle, WriteResources::Stdout(stdout_locker)))
     }
 
@@ -490,17 +508,31 @@ impl StreamDuplexer {
     /// Unlike [`std::io::stdin`] and [`std::io::stdout`], this `stdin_stdout`
     /// returns a stream which is unbuffered and unlocked.
     ///
-    /// This acquires a [`std::io::StdinLock`] and a [`std::io::StdoutLock`] to
-    /// prevent accesses to [`std::io::Stdin`] and [`std::io::Stdout`] while
-    /// this is live, and fails if a `StreamReader` for standard input, a
-    /// `StreamWriter` for standard output, or a `StreamDuplexer` for standard
-    /// input and standard output already exist.
+    /// This acquires a [`std::io::StdinLock`] and a [`std::io::StdoutLock`]
+    /// (in non-recursive ways) to prevent accesses to [`std::io::Stdin`] and
+    /// [`std::io::Stdout`] while this is live, and fails if a `StreamReader`
+    /// for standard input, a `StreamWriter` for standard output, or a
+    /// `StreamDuplexer` for standard input and standard output already exist.
     #[inline]
     pub fn stdin_stdout() -> io::Result<Self> {
         let stdin_locker = StdinLocker::new()?;
         let stdout_locker = StdoutLocker::new()?;
-        let read = stdin_locker.as_unsafe_handle();
-        let write = stdout_locker.as_unsafe_handle();
+
+        // Obtain stdin's and stdout's handles.
+        #[cfg(not(windows))]
+        let (read, write) = (
+            stdin_locker.as_unsafe_handle(),
+            stdout_locker.as_unsafe_handle(),
+        );
+
+        // On Windows, stdin and stdout may be connected to a UTF-16 console,
+        // which `RawHandleOrSocket` can take care of for us.
+        #[cfg(windows)]
+        let (read, write) = (
+            UnsafeHandle::unowned_from_raw_handle_or_socket(RawHandleOrSocket::stdin()),
+            UnsafeHandle::unowned_from_raw_handle_or_socket(RawHandleOrSocket::stdout()),
+        );
+
         Ok(Self::two_handles(
             read,
             write,
