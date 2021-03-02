@@ -1,46 +1,43 @@
 //! Hold locks for the process' stdin and stdout.
 
-use once_cell::sync::Lazy;
 use parking::{Parker, Unparker};
 #[cfg(unix)]
 use std::os::unix::io::{AsRawFd, RawFd};
 #[cfg(target_os = "wasi")]
 use std::os::wasi::io::{AsRawFd, RawFd};
 use std::{
-    io::{self, stdin, stdout, Stdin, Stdout},
+    io::{self, stdin, stdout},
     sync::atomic::{AtomicBool, Ordering::SeqCst},
     thread::{self, JoinHandle},
 };
 use system_interface::io::ReadReady;
-use unsafe_io::{AsUnsafeFile, OwnsRaw};
+use unsafe_io::{AsUnsafeFile, OwnsRaw, UnsafeFile};
 #[cfg(windows)]
 use {
     std::os::windows::io::{AsRawHandle, RawHandle},
     unsafe_io::os::windows::{AsRawHandleOrSocket, RawHandleOrSocket},
 };
 
-// Static handles to `stdin()` and `stdout()` so that we can reference
-// them with `StdinLock` and `StdoutLock` with `'static` lifetime
-// parameters.
-static STDIN: Lazy<Stdin> = Lazy::new(stdin);
-static STDOUT: Lazy<Stdout> = Lazy::new(stdout);
-
-// Statically track whether `STDIN` and `STDOUT` are claimed.
+// Statically track whether stdin and stdout are claimed. This allows us to
+// issue an error if they're ever claimed multiple times, instead of just
+// hanging.
 static STDIN_CLAIMED: AtomicBool = AtomicBool::new(false);
 static STDOUT_CLAIMED: AtomicBool = AtomicBool::new(false);
 
 /// This class acquires a lock on `stdin` and prevents applications from
 /// accidentally accessing it through other means.
 pub(crate) struct StdinLocker {
+    unsafe_file: UnsafeFile,
     unparker: Unparker,
-    handle: Option<JoinHandle<()>>,
+    join_handle: Option<JoinHandle<()>>,
 }
 
 /// This class acquires a lock on `stdout` and prevents applications from
 /// accidentally accessing it through other means.
 pub(crate) struct StdoutLocker {
+    unsafe_file: UnsafeFile,
     unparker: Unparker,
-    handle: Option<JoinHandle<()>>,
+    join_handle: Option<JoinHandle<()>>,
 }
 
 impl StdinLocker {
@@ -58,17 +55,23 @@ impl StdinLocker {
             // the lock on a parked thread.
             let parker = Parker::new();
             let unparker = parker.unparker();
-            let handle = Some(
+            let stdin = stdin();
+            let unsafe_file = stdin.as_unsafe_file();
+            let join_handle = Some(
                 thread::Builder::new()
                     .name("ensure exclusive access to stdin".to_owned())
                     .stack_size(64)
                     .spawn(move || {
-                        let _lock = STDIN.lock();
+                        let _lock = stdin.lock();
                         parker.park()
                     })?,
             );
 
-            Ok(Self { unparker, handle })
+            Ok(Self {
+                unsafe_file,
+                unparker,
+                join_handle,
+            })
         } else {
             Err(io::Error::new(
                 io::ErrorKind::Other,
@@ -93,17 +96,23 @@ impl StdoutLocker {
             // the lock on a parked thread.
             let parker = Parker::new();
             let unparker = parker.unparker();
-            let handle = Some(
+            let stdout = stdout();
+            let unsafe_file = stdout.as_unsafe_file();
+            let join_handle = Some(
                 thread::Builder::new()
                     .name("ensure exclusive access to stdout".to_owned())
                     .stack_size(64)
                     .spawn(move || {
-                        let _lock = STDOUT.lock();
+                        let _lock = stdout.lock();
                         parker.park()
                     })?,
             );
 
-            Ok(Self { unparker, handle })
+            Ok(Self {
+                unsafe_file,
+                unparker,
+                join_handle,
+            })
         } else {
             Err(io::Error::new(
                 io::ErrorKind::Other,
@@ -117,7 +126,7 @@ impl Drop for StdinLocker {
     #[inline]
     fn drop(&mut self) {
         self.unparker.unpark();
-        self.handle.take().unwrap().join().unwrap();
+        self.join_handle.take().unwrap().join().unwrap();
         STDIN_CLAIMED.store(false, SeqCst);
     }
 }
@@ -126,7 +135,7 @@ impl Drop for StdoutLocker {
     #[inline]
     fn drop(&mut self) {
         self.unparker.unpark();
-        self.handle.take().unwrap().join().unwrap();
+        self.join_handle.take().unwrap().join().unwrap();
         STDOUT_CLAIMED.store(false, SeqCst);
     }
 }
@@ -135,7 +144,7 @@ impl Drop for StdoutLocker {
 impl AsRawFd for StdinLocker {
     #[inline]
     fn as_raw_fd(&self) -> RawFd {
-        STDIN.as_raw_fd()
+        self.unsafe_file.as_raw_fd()
     }
 }
 
@@ -143,7 +152,7 @@ impl AsRawFd for StdinLocker {
 impl AsRawFd for StdoutLocker {
     #[inline]
     fn as_raw_fd(&self) -> RawFd {
-        STDOUT.as_raw_fd()
+        self.unsafe_file.as_raw_fd()
     }
 }
 
@@ -151,7 +160,7 @@ impl AsRawFd for StdoutLocker {
 impl AsRawHandle for StdinLocker {
     #[inline]
     fn as_raw_handle(&self) -> RawHandle {
-        STDIN.as_raw_handle()
+        self.unsafe_file.as_raw_handle()
     }
 }
 
@@ -159,7 +168,7 @@ impl AsRawHandle for StdinLocker {
 impl AsRawHandle for StdoutLocker {
     #[inline]
     fn as_raw_handle(&self) -> RawHandle {
-        STDOUT.as_raw_handle()
+        self.unsafe_file.as_raw_handle()
     }
 }
 
@@ -167,7 +176,7 @@ impl AsRawHandle for StdoutLocker {
 impl AsRawHandleOrSocket for StdinLocker {
     #[inline]
     fn as_raw_handle_or_socket(&self) -> RawHandleOrSocket {
-        RawHandleOrSocket::from_raw_handle(STDIN.as_raw_handle())
+        RawHandleOrSocket::unowned_from_raw_handle(self.as_raw_handle())
     }
 }
 
@@ -175,7 +184,7 @@ impl AsRawHandleOrSocket for StdinLocker {
 impl AsRawHandleOrSocket for StdoutLocker {
     #[inline]
     fn as_raw_handle_or_socket(&self) -> RawHandleOrSocket {
-        RawHandleOrSocket::from_raw_handle(STDOUT.as_raw_handle())
+        RawHandleOrSocket::unowned_from_raw_handle(self.as_raw_handle())
     }
 }
 
