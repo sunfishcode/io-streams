@@ -1093,15 +1093,15 @@ impl AsRawReadWriteFd for AsyncStreamDuplexer {
 impl AsRawHandleOrSocket for AsyncStreamReader {
     #[inline]
     fn as_raw_handle_or_socket(&self) -> RawHandleOrSocket {
-        match &mut self.resources {
+        match &self.resources {
             ReadResources::File(file) => file.as_raw_handle_or_socket(),
             ReadResources::TcpStream(tcp_stream) => tcp_stream.as_raw_handle_or_socket(),
             #[cfg(unix)]
             ReadResources::UnixStream(unix_stream) => unix_stream.as_raw_handle_or_socket(),
-            ReadResources::PipeReader(pipe_reader) => todo!("async pipe as_raw_handle_or_socket"),
-            ReadResources::Stdin(stdin) => todo!("async stdin as_raw_handle_or_socket"),
+            ReadResources::PipeReader(_pipe_reader) => todo!("async pipe as_raw_handle_or_socket"),
+            ReadResources::Stdin(_stdin) => todo!("async stdin as_raw_handle_or_socket"),
             #[cfg(not(target_os = "wasi"))]
-            ReadResources::PipedThread(piped_thread) => {
+            ReadResources::PipedThread(_piped_thread) => {
                 todo!("async piped_thread as_raw_handle_or_socket")
             }
             #[cfg(not(target_os = "wasi"))]
@@ -1149,7 +1149,7 @@ impl AsRawHandleOrSocket for AsyncStreamWriter {
 impl AsRawReadWriteHandleOrSocket for AsyncStreamDuplexer {
     #[inline]
     fn as_raw_read_handle_or_socket(&self) -> RawHandleOrSocket {
-        match &mut self.resources {
+        match &self.resources {
             DuplexResources::TcpStream(tcp_stream) => {
                 Pin::new(tcp_stream).as_raw_handle_or_socket()
             }
@@ -1183,7 +1183,7 @@ impl AsRawReadWriteHandleOrSocket for AsyncStreamDuplexer {
 
     #[inline]
     fn as_raw_write_handle_or_socket(&self) -> RawHandleOrSocket {
-        match &mut self.resources {
+        match &self.resources {
             DuplexResources::TcpStream(tcp_stream) => {
                 Pin::new(tcp_stream).as_raw_handle_or_socket()
             }
