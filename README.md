@@ -21,6 +21,11 @@ is performed on a thread and connecting to the `StreamReader` or `StreamWriter`
 with a [pipe], and a "socketed thread" concept, where a provided function is
 called on a thread and connected to the main thread via a bidirectional socket.
 
+This crate also defines [`AsyncStreamReader`], [`AsyncStreamWriter`], and
+[`AsyncStreamDuplexer`], which are async functions that work with `async-std`.
+Not all features are supported yet, but basic file and socket support is in
+place.
+
 On Posix-ish platforms, including limited support for WASI, these types just
 contain a single file descriptor (and implement [`AsRawFd`]), plus any
 resources needed to safely hold the file descriptor live. On Windows, they
@@ -44,6 +49,9 @@ they are locked will block indefinitely.
 [`StreamReader`]: https://docs.rs/io-streams/latest/io_streams/struct.StreamReader.html
 [`StreamWriter`]: https://docs.rs/io-streams/latest/io_streams/struct.StreamWriter.html
 [`StreamDuplexer`]: https://docs.rs/io-streams/latest/io_streams/struct.StreamDuplexer.html
+[`AsyncStreamReader`]: https://docs.rs/io-streams/latest/io_streams/struct.AsyncStreamReader.html
+[`AsyncStreamWriter`]: https://docs.rs/io-streams/latest/io_streams/struct.AsyncStreamWriter.html
+[`AsyncStreamDuplexer`]: https://docs.rs/io-streams/latest/io_streams/struct.AsyncStreamDuplexer.html
 [`io_streams::BufDuplexer`]: https://docs.rs/io-streams/latest/io_streams/struct.BufDuplexer.html
 [`io_streams::BufReaderLineWriter`]: https://docs.rs/io-streams/latest/io_streams/struct.BufReaderLineWriter.html
 [`std::io::Stdin`]: https://doc.rust-lang.org/std/io/struct.Stdin.html
