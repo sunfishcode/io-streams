@@ -19,9 +19,13 @@
 #![cfg_attr(read_initializer, feature(read_initializer))]
 #![cfg_attr(target_os = "wasi", feature(wasi_ext))]
 
+#[cfg(feature = "async-std")]
+mod async_std;
 mod buffered;
 mod lockers;
 mod streams;
 
+#[cfg(feature = "async-std")]
+pub use crate::async_std::{AsyncStreamDuplexer, AsyncStreamReader, AsyncStreamWriter};
 pub use buffered::{BufDuplexer, BufReaderLineWriter, IntoInnerError};
 pub use streams::{StreamDuplexer, StreamReader, StreamWriter};
