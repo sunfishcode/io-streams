@@ -42,8 +42,8 @@ use {
     },
 };
 
-/// An unbuffered and unlocked input byte stream, abstracted over the source of
-/// the input.
+/// An unbuffered and unlocked input byte stream, implementing [`Read`],
+/// abstracted over the source of the input.
 ///
 /// It primarily consists of a single file handle, and also contains any
 /// resources needed to safely hold the file handle live.
@@ -57,8 +57,8 @@ pub struct StreamReader {
     resources: ReadResources,
 }
 
-/// An unbuffered and unlocked output byte stream, abstracted over the
-/// destination of the output.
+/// An unbuffered and unlocked output byte stream, implementing [`Write`],
+/// abstracted over the destination of the output.
 ///
 /// It primarily consists of a single file handle, and also contains any
 /// resources needed to safely hold the file handle live.
@@ -74,7 +74,8 @@ pub struct StreamWriter {
     resources: WriteResources,
 }
 
-/// An unbuffered and unlocked interactive combination input and output stream.
+/// An unbuffered and unlocked interactive combination input and output stream,
+/// implementing [`Read`] and [`Write`].
 ///
 /// This may hold two file descriptors, one for reading and one for writing,
 /// such as stdin and stdout, or it may hold one file handle for both
