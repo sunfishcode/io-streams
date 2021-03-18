@@ -8,7 +8,6 @@ license = "Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT"
 keywords = ["io"]
 categories = ["rust-patterns"]
 repository = "https://github.com/sunfishcode/io-streams"
-readme = "README.md"
 
 [build-dependencies]
 rustc_version = "0.3.0"
