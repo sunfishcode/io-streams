@@ -23,8 +23,8 @@ called on a thread and connected to the main thread via a bidirectional socket.
 
 This crate also defines [`AsyncStreamReader`], [`AsyncStreamWriter`], and
 [`AsyncStreamDuplexer`], which are async functions that work with `async-std`.
-Not all features are supported yet, but basic file and socket support is in
-place.
+Not all features are supported yet, and they aren't fully optimized yet,
+but basic file and socket support is in place.
 
 On Posix-ish platforms, including limited support for WASI, these types just
 contain a single file descriptor (and implement [`AsRawFd`]), plus any
