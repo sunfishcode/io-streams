@@ -169,6 +169,9 @@ impl StreamReader {
     /// Unlike [`std::io::stdin`], this `stdin` returns a stream which is
     /// unbuffered and unlocked.
     ///
+    /// Since it is unbuffered, it is often beneficial to wrap the resulting
+    /// `StreamReader` in a [`BufReader`].
+    ///
     /// This acquires a [`std::io::StdinLock`] (in a non-recursive way) to
     /// prevent accesses to `std::io::Stdin` while this is live, and fails if a
     /// `StreamReader` or `StreamDuplexer` for standard input already exists.
@@ -343,6 +346,9 @@ impl StreamWriter {
     ///
     /// Unlike [`std::io::stdout`], this `stdout` returns a stream which is
     /// unbuffered and unlocked.
+    ///
+    /// Since it is unbuffered, it is often beneficial to wrap the resulting
+    /// `StreamWriter` in a [`BufWriter`] or [`LineWriter`].
     ///
     /// This acquires a [`std::io::StdoutLock`] (in a non-recursive way) to
     /// prevent accesses to `std::io::Stdout` while this is live, and fails if
