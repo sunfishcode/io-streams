@@ -292,6 +292,19 @@ impl StreamReader {
         ))
     }
 
+    /// Read from the null device, which produces no data.
+    pub fn null() -> io::Result<Self> {
+        #[cfg(not(windows))]
+        {
+            Ok(Self::file(File::open("/dev/null")?))
+        }
+
+        #[cfg(windows)]
+        {
+            Ok(Self::file(File::open("nul")?))
+        }
+    }
+
     /// Read from the given string.
     #[inline]
     #[cfg(not(target_os = "wasi"))] // WASI doesn't support pipes yet
