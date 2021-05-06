@@ -118,11 +118,21 @@ fn test_copy() -> anyhow::Result<()> {
 
 #[test]
 #[cfg(not(target_os = "wasi"))] // WASI doesn't support pipes yet
-fn test_null() -> anyhow::Result<()> {
+fn test_null_output() -> anyhow::Result<()> {
     let mut input = StreamReader::str("send to null")?;
     let mut output = StreamWriter::null()?;
     copy(&mut input, &mut output)?;
     output.flush()?;
+    Ok(())
+}
+
+#[test]
+#[cfg(not(target_os = "wasi"))] // WASI doesn't support pipes yet
+fn test_null_input() -> anyhow::Result<()> {
+    let mut input = StreamReader::null()?;
+    let mut s = String::new();
+    input.read_to_string(&mut s)?;
+    assert!(s.is_empty());
     Ok(())
 }
 
