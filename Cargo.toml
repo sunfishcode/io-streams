@@ -15,15 +15,16 @@ rustc_version = "0.3.0"
 
 [dependencies]
 async-std = { version = "1.9.0", optional = true }
-char-device = { version = "0.3.1", optional = true }
-duplex = "0.3.1"
-layered-io = { version = "0.4.0", optional = true }
+char-device = { version = "0.4.0", optional = true }
+duplex = "0.4.0"
+layered-io = { version = "0.5.0", optional = true }
 memchr = "2.3.4"
 parking = "2.0.0"
-socketpair = { version = "0.6.1", optional = true }
-system-interface = { version = "0.6.3", features = ["use_os_pipe"] }
-terminal-io = { version = "0.3.0", optional = true }
-unsafe-io = { version = "0.6.1", features = ["os_pipe"] }
+socketpair = { version = "0.7.0", optional = true }
+system-interface = { version = "0.6.4", features = ["use_os_pipe", "socketpair"] }
+terminal-io = { version = "0.4.0", optional = true }
+tokio = { version = "1.6.0", optional = true, features = ["fs", "net"] }
+unsafe-io = { version = "0.6.8", features = ["os_pipe"] }
 utf8-io = { version = "0.4.0", optional = true }
 
 # WASI doesn't support pipes yet
@@ -36,16 +37,19 @@ libc = "0.2.87"
 [dev-dependencies]
 anyhow = "1.0.38"
 cap-tempfile = "0.13.7"
-char-device = "0.3.0"
-duplex = { version = "0.3.0", features = ["char-device"] }
+char-device = "0.4.0"
+duplex = { version = "0.4.0", features = ["char-device"] }
 
 [features]
 default = []
 use_socketpair = ["socketpair", "duplex/socketpair", "system-interface/socketpair"]
 use_char_device = ["char-device", "duplex/char-device", "system-interface/char-device"]
-use_async_std = ["unsafe-io/async-std"]
-use_async_char_device = ["char-device/use_async_std", "duplex/use_async_char_device"]
-use_async_socketpair = ["socketpair/use_async_std", "duplex/use_async_socketpair"]
+use_async_std = ["async-std", "unsafe-io/async-std"]
+use_tokio = ["tokio", "unsafe-io/tokio"]
+use_async_std_char_device = ["char-device/use_async_std", "duplex/use_async_std_char_device", "system-interface/char-device"]
+use_async_std_socketpair = ["socketpair/use_async_std", "duplex/use_async_std_socketpair", "system-interface/socketpair"]
+use_tokio_char_device = ["char-device/use_tokio", "duplex/use_tokio_char_device", "system-interface/char-device"]
+use_tokio_socketpair = ["socketpair/use_tokio", "duplex/use_tokio_socketpair", "system-interface/socketpair"]
 
 [badges]
 maintenance = { status = "actively-developed" }

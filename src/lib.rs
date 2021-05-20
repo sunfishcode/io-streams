@@ -24,8 +24,12 @@ mod async_std;
 mod buffered;
 mod lockers;
 mod streams;
+#[cfg(feature = "tokio")]
+mod tokio;
 
 #[cfg(feature = "async-std")]
 pub use crate::async_std::{AsyncStreamDuplexer, AsyncStreamReader, AsyncStreamWriter};
+#[cfg(feature = "tokio")]
+pub use crate::tokio::{TokioStreamDuplexer, TokioStreamReader, TokioStreamWriter};
 pub use buffered::{BufDuplexer, BufReaderLineWriter, IntoInnerError};
 pub use streams::{StreamDuplexer, StreamReader, StreamWriter};
