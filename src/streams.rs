@@ -175,6 +175,8 @@ impl StreamReader {
     /// This acquires a [`std::io::StdinLock`] (in a non-recursive way) to
     /// prevent accesses to `std::io::Stdin` while this is live, and fails if a
     /// `StreamReader` or `StreamDuplexer` for standard input already exists.
+    ///
+    /// [`BufReader`]: std::io::BufReader
     #[inline]
     pub fn stdin() -> io::Result<Self> {
         let stdin_locker = StdinLocker::new()?;
@@ -367,6 +369,9 @@ impl StreamWriter {
     /// prevent accesses to `std::io::Stdout` while this is live, and fails if
     /// a `StreamWriter` or `StreamDuplexer` for standard output already
     /// exists.
+    ///
+    /// [`BufWriter`]: std::io::BufWriter
+    /// [`LineWriter`]: std::io::LineWriter
     #[inline]
     pub fn stdout() -> io::Result<Self> {
         let stdout_locker = StdoutLocker::new()?;
