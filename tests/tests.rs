@@ -136,6 +136,19 @@ fn test_null_input() -> anyhow::Result<()> {
     Ok(())
 }
 
+#[test]
+#[cfg(not(target_os = "wasi"))] // WASI doesn't support pipes yet
+fn test_null_duplex() -> anyhow::Result<()> {
+    let mut duplex = StreamDuplexer::null()?;
+    let mut s = String::new();
+    duplex.read_to_string(&mut s)?;
+    assert!(s.is_empty());
+    let mut input = StreamReader::str("send to null")?;
+    copy(&mut input, &mut duplex)?;
+    duplex.flush()?;
+    Ok(())
+}
+
 #[cfg(all(not(target_os = "wasi"), feature = "socketpair"))]
 #[test]
 fn test_socketed_thread_func() -> anyhow::Result<()> {

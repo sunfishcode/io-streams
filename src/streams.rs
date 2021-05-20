@@ -11,7 +11,7 @@ use std::os::unix::{
 use std::os::wasi::io::{AsRawFd, RawFd};
 use std::{
     fmt::{self, Arguments, Debug},
-    fs::File,
+    fs::{File, OpenOptions},
     io::{self, IoSlice, IoSliceMut, Read, Seek, Write},
     net::TcpStream,
 };
@@ -140,6 +140,7 @@ enum DuplexResources {
     ChildStdoutStdin((ChildStdout, ChildStdin)),
     #[cfg(feature = "char-device")]
     CharDevice(CharDevice),
+    DevNull(File),
     TcpStream(TcpStream),
     #[cfg(unix)]
     UnixStream(UnixStream),
@@ -780,6 +781,22 @@ impl StreamDuplexer {
         ))
     }
 
+    /// Read and write with the null device, which ignores all data, and
+    /// produces no data.
+    pub fn null() -> io::Result<Self> {
+        #[cfg(not(windows))]
+        let file = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open("/dev/null")?;
+
+        #[cfg(windows)]
+        let file = OpenOptions::new().read(true).write(true).open("nul")?;
+
+        let handle = file.as_unsafe_handle();
+        Ok(Self::handle(handle, DuplexResources::DevNull(file)))
+    }
+
     #[inline]
     #[must_use]
     fn handle(handle: UnsafeHandle, resources: DuplexResources) -> Self {
@@ -1050,6 +1067,7 @@ impl ReadReady for StreamDuplexer {
             }
             #[cfg(feature = "char-device")]
             DuplexResources::CharDevice(char_device) => ReadReady::num_ready_bytes(char_device),
+            DuplexResources::DevNull(file) => ReadReady::num_ready_bytes(file),
             DuplexResources::TcpStream(tcp_stream) => ReadReady::num_ready_bytes(tcp_stream),
             #[cfg(unix)]
             DuplexResources::UnixStream(unix_stream) => ReadReady::num_ready_bytes(unix_stream),
