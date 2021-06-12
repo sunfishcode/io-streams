@@ -24,6 +24,16 @@ use {
 static STDIN_CLAIMED: AtomicBool = AtomicBool::new(false);
 static STDOUT_CLAIMED: AtomicBool = AtomicBool::new(false);
 
+// The locker thread just acquires a lock and parks, so it doesn't need much
+// memory. Rust adjusts this up to `PTHREAD_STACK_MIN`/etc. as needed.
+#[cfg(not(target_os = "freebsd"))]
+const LOCKER_STACK_SIZE: usize = 64;
+
+// On FreeBSD, we reportedly need more than the minimum:
+// <https://github.com/sunfishcode/io-streams/issues/3#issuecomment-860028594>
+#[cfg(target_os = "freebsd")]
+const LOCKER_STACK_SIZE: usize = 32 * 1024;
+
 /// This class acquires a lock on `stdin` and prevents applications from
 /// accidentally accessing it through other means.
 pub(crate) struct StdinLocker {
@@ -60,7 +70,7 @@ impl StdinLocker {
             let join_handle = Some(
                 thread::Builder::new()
                     .name("ensure exclusive access to stdin".to_owned())
-                    .stack_size(64)
+                    .stack_size(LOCKER_STACK_SIZE)
                     .spawn(move || {
                         let _lock = stdin.lock();
                         parker.park()
@@ -101,7 +111,7 @@ impl StdoutLocker {
             let join_handle = Some(
                 thread::Builder::new()
                     .name("ensure exclusive access to stdout".to_owned())
-                    .stack_size(64)
+                    .stack_size(LOCKER_STACK_SIZE)
                     .spawn(move || {
                         let _lock = stdout.lock();
                         parker.park()
