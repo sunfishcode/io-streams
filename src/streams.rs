@@ -320,7 +320,7 @@ impl StreamReader {
     pub fn bytes(bytes: &[u8]) -> io::Result<Self> {
         // If we can write it to a new pipe without blocking, do so.
         #[cfg(not(any(windows, target_os = "redox")))]
-        if bytes.len() <= libc::PIPE_BUF {
+        if bytes.len() <= posish::io::PIPE_BUF {
             let (pipe_reader, mut pipe_writer) = pipe()?;
 
             pipe_writer.write_all(bytes)?;
