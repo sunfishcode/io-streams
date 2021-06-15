@@ -1,14 +1,16 @@
 #![cfg_attr(can_vector, feature(can_vector))]
 #![cfg_attr(write_all_vectored, feature(write_all_vectored))]
 
-use cap_tempfile::{tempdir, TempDir};
+use cap_tempfile::{ambient_authority, tempdir, TempDir};
+#[cfg(not(target_os = "wasi"))]
+use io_streams::StreamDuplexer;
 use io_streams::{StreamReader, StreamWriter};
 use std::io::{self, copy, Read, Write};
 #[cfg(all(not(target_os = "wasi"), feature = "socketpair"))]
-use {io_streams::StreamDuplexer, socketpair::SocketpairStream, std::str};
+use {socketpair::SocketpairStream, std::str};
 
 fn tmpdir() -> TempDir {
-    unsafe { tempdir() }.expect("expected to be able to create a temporary directory")
+    tempdir(ambient_authority()).expect("expected to be able to create a temporary directory")
 }
 
 #[test]

@@ -11,7 +11,7 @@ repository = "https://github.com/sunfishcode/io-streams"
 exclude = ["/.github"]
 
 [build-dependencies]
-rustc_version = "0.3.0"
+rustc_version = "0.4.0"
 
 [dependencies]
 async-std = { version = "1.9.0", optional = true }
@@ -36,7 +36,7 @@ posish = "0.7.1"
 
 [dev-dependencies]
 anyhow = "1.0.38"
-cap-tempfile = "0.13.7"
+cap-tempfile = "0.14.0"
 char-device = "0.4.0"
 duplex = { version = "0.4.0", features = ["char-device"] }
 
