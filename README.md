@@ -27,7 +27,7 @@ Not all features are supported yet, and they aren't fully optimized yet,
 but basic file and socket support is in place.
 
 On Posix-ish platforms, including limited support for WASI, these types just
-contain a single file descriptor (and implement [`AsRawFd`]), plus any
+contain a single file descriptor (and implement [`AsFd`]), plus any
 resources needed to safely hold the file descriptor live. On Windows, they
 contain an enum holding either `RawHandle` or `RawSocket`.
 
@@ -59,7 +59,7 @@ they are locked will block indefinitely.
 [`std::io::BufReader`]: https://doc.rust-lang.org/std/io/struct.BufReader.html
 [`std::io::BufWriter`]: https://doc.rust-lang.org/std/io/struct.BufWriter.html
 [`std::io::LineWriter`]: https://doc.rust-lang.org/std/io/struct.LineWriter.html
-[`AsRawFd`]: https://doc.rust-lang.org/std/os/unix/io/trait.AsRawFd.html
+[`AsFd`]: https://docs.rs/io-lifetimes/0.2.0/io_lifetimes/trait.AsFd.html
 [pipe]: https://crates.io/crates/os_pipe
 [`std::fs::File`]: https://doc.rust-lang.org/std/fs/struct.File.html
 [`std::net::TcpStream`]: https://doc.rust-lang.org/std/net/struct.TcpStream.html

@@ -28,7 +28,7 @@ use unsafe_io::os::windows::{
 };
 use unsafe_io::{
     AsUnsafeHandle, AsUnsafeReadWriteHandle, FromUnsafeFile, FromUnsafeSocket, IntoUnsafeFile,
-    IntoUnsafeSocket, OwnsRaw,
+    IntoUnsafeSocket,
 };
 #[cfg(all(not(target_os = "wasi"), feature = "socketpair"))]
 use {duplex::HalfDuplex, socketpair::AsyncStdSocketpairStream};
@@ -1217,15 +1217,6 @@ impl AsRawReadWriteHandleOrSocket for AsyncStreamDuplexer {
         }
     }
 }
-
-// Safety: AsyncStreamReader owns its handle.
-unsafe impl OwnsRaw for AsyncStreamReader {}
-
-// Safety: AsyncStreamWriter owns its handle.
-unsafe impl OwnsRaw for AsyncStreamWriter {}
-
-// Safety: AsyncStreamDuplexer owns its handle.
-unsafe impl OwnsRaw for AsyncStreamDuplexer {}
 
 impl Drop for ReadResources {
     fn drop(&mut self) {

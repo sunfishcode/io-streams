@@ -24,7 +24,7 @@ use unsafe_io::os::windows::{
 };
 use unsafe_io::{
     AsUnsafeHandle, AsUnsafeReadWriteHandle, FromUnsafeFile, FromUnsafeSocket, IntoUnsafeFile,
-    IntoUnsafeSocket, OwnsRaw, UnsafeHandle, UnsafeReadable, UnsafeWriteable,
+    IntoUnsafeSocket, UnsafeHandle, UnsafeReadable, UnsafeWriteable,
 };
 #[cfg(all(not(target_os = "wasi"), feature = "socketpair"))]
 use {
@@ -1207,15 +1207,6 @@ impl AsRawReadWriteHandleOrSocket for StreamDuplexer {
         self.write_handle.as_raw_handle_or_socket()
     }
 }
-
-// Safety: StreamReader owns its handle.
-unsafe impl OwnsRaw for StreamReader {}
-
-// Safety: StreamWriter owns its handle.
-unsafe impl OwnsRaw for StreamWriter {}
-
-// Safety: StreamDuplexer owns its handle.
-unsafe impl OwnsRaw for StreamDuplexer {}
 
 impl Drop for ReadResources {
     fn drop(&mut self) {

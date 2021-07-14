@@ -22,7 +22,7 @@ use unsafe_io::os::posish::AsRawReadWriteFd;
 use unsafe_io::os::windows::{
     AsRawHandleOrSocket, AsRawReadWriteHandleOrSocket, RawHandleOrSocket,
 };
-use unsafe_io::{AsUnsafeHandle, AsUnsafeReadWriteHandle, FromUnsafeFile, IntoUnsafeFile, OwnsRaw};
+use unsafe_io::{AsUnsafeHandle, AsUnsafeReadWriteHandle, FromUnsafeFile, IntoUnsafeFile};
 #[cfg(all(not(target_os = "wasi"), feature = "socketpair"))]
 use {duplex::HalfDuplex, socketpair::TokioSocketpairStream};
 #[cfg(not(target_os = "wasi"))]
@@ -1158,15 +1158,6 @@ impl AsRawReadWriteHandleOrSocket for TokioStreamDuplexer {
         }
     }
 }
-
-// Safety: TokioStreamReader owns its handle.
-unsafe impl OwnsRaw for TokioStreamReader {}
-
-// Safety: TokioStreamWriter owns its handle.
-unsafe impl OwnsRaw for TokioStreamWriter {}
-
-// Safety: TokioStreamDuplexer owns its handle.
-unsafe impl OwnsRaw for TokioStreamDuplexer {}
 
 impl Drop for ReadResources {
     fn drop(&mut self) {

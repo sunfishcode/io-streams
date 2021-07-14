@@ -11,7 +11,7 @@ use std::{
     thread::{self, JoinHandle},
 };
 use system_interface::io::ReadReady;
-use unsafe_io::{AsUnsafeFile, OwnsRaw, UnsafeFile};
+use unsafe_io::{AsUnsafeFile, UnsafeFile};
 #[cfg(windows)]
 use {
     std::os::windows::io::{AsRawHandle, RawHandle},
@@ -197,12 +197,6 @@ impl AsRawHandleOrSocket for StdoutLocker {
         RawHandleOrSocket::unowned_from_raw_handle(self.as_raw_handle())
     }
 }
-
-// Safety: StdinLocker owns its file descriptor.
-unsafe impl OwnsRaw for StdinLocker {}
-
-// Safety: StdoutLocker owns its file descriptor.
-unsafe impl OwnsRaw for StdoutLocker {}
 
 impl ReadReady for StdinLocker {
     #[inline]

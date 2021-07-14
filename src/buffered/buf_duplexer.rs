@@ -13,7 +13,6 @@ use std::{
 };
 #[cfg(not(windows))]
 use unsafe_io::os::posish::{AsRawFd, RawFd};
-use unsafe_io::OwnsRaw;
 #[cfg(windows)]
 use {
     std::os::windows::io::{AsRawHandle, AsRawSocket, RawHandle, RawSocket},
@@ -751,9 +750,6 @@ impl<Inner: HalfDuplex + AsRawHandleOrSocket> AsRawHandleOrSocket for BufDuplexe
     }
 }
 
-// Safety: `BufDuplexer` implements `OwnsRaw` if `Inner` does.
-unsafe impl<Inner: HalfDuplex + OwnsRaw> OwnsRaw for BufDuplexer<Inner> {}
-
 #[cfg(not(windows))]
 impl<Inner: HalfDuplex + AsRawFd> AsRawFd for BufDuplexerBackend<Inner> {
     #[inline]
@@ -785,9 +781,6 @@ impl<Inner: HalfDuplex + AsRawHandleOrSocket> AsRawHandleOrSocket for BufDuplexe
         self.inner.as_ref().unwrap().as_raw_handle_or_socket()
     }
 }
-
-// Safety: `BufDuplexerBackend` implements `OwnsRaw` if `Inner` does.
-unsafe impl<Inner: HalfDuplex + OwnsRaw> OwnsRaw for BufDuplexerBackend<Inner> {}
 
 #[cfg(feature = "terminal-io")]
 impl<Inner: HalfDuplex + terminal_io::WriteTerminal> terminal_io::Terminal for BufDuplexer<Inner> {}
