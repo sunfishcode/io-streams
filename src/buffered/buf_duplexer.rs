@@ -12,11 +12,17 @@ use std::{
     io::{self, BufRead, Error, ErrorKind, IoSlice, IoSliceMut, Read, Write},
 };
 #[cfg(not(windows))]
-use unsafe_io::os::posish::{AsRawFd, RawFd};
+use {
+    io_lifetimes::{AsFd, BorrowedFd},
+    unsafe_io::os::posish::{AsRawFd, RawFd},
+};
 #[cfg(windows)]
 use {
+    io_lifetimes::{AsHandle, AsSocket, BorrowedHandle, BorrowedSocket},
     std::os::windows::io::{AsRawHandle, AsRawSocket, RawHandle, RawSocket},
-    unsafe_io::os::windows::{AsRawHandleOrSocket, RawHandleOrSocket},
+    unsafe_io::os::windows::{
+        AsHandleOrSocket, AsRawHandleOrSocket, BorrowedHandleOrSocket, RawHandleOrSocket,
+    },
 };
 
 /// Wraps a reader and writer and buffers their output.
@@ -779,6 +785,70 @@ impl<Inner: HalfDuplex + AsRawHandleOrSocket> AsRawHandleOrSocket for BufDuplexe
     #[inline]
     fn as_raw_handle_or_socket(&self) -> RawHandleOrSocket {
         self.inner.as_ref().unwrap().as_raw_handle_or_socket()
+    }
+}
+
+#[cfg(not(windows))]
+impl<Inner: HalfDuplex + AsFd> AsFd for BufDuplexer<Inner> {
+    #[inline]
+    fn as_fd(&self) -> BorrowedFd<'_> {
+        self.inner.as_fd()
+    }
+}
+
+#[cfg(windows)]
+impl<Inner: HalfDuplex + AsHandle> AsHandle for BufDuplexer<Inner> {
+    #[inline]
+    fn as_handle(&self) -> BorrowedHandle<'_> {
+        self.inner.as_handle()
+    }
+}
+
+#[cfg(windows)]
+impl<Inner: HalfDuplex + AsSocket> AsSocket for BufDuplexer<Inner> {
+    #[inline]
+    fn as_socket(&self) -> BorrowedSocket<'_> {
+        self.inner.as_socket()
+    }
+}
+
+#[cfg(windows)]
+impl<Inner: HalfDuplex + AsHandleOrSocket> AsHandleOrSocket for BufDuplexer<Inner> {
+    #[inline]
+    fn as_handle_or_socket(&self) -> BorrowedHandleOrSocket<'_> {
+        self.inner.as_handle_or_socket()
+    }
+}
+
+#[cfg(not(windows))]
+impl<Inner: HalfDuplex + AsFd> AsFd for BufDuplexerBackend<Inner> {
+    #[inline]
+    fn as_fd(&self) -> BorrowedFd<'_> {
+        self.inner.as_ref().unwrap().as_fd()
+    }
+}
+
+#[cfg(windows)]
+impl<Inner: HalfDuplex + AsHandle> AsHandle for BufDuplexerBackend<Inner> {
+    #[inline]
+    fn as_handle(&self) -> BorrowedHandle<'_> {
+        self.inner.as_ref().unwrap().as_handle()
+    }
+}
+
+#[cfg(windows)]
+impl<Inner: HalfDuplex + AsSocket> AsSocket for BufDuplexerBackend<Inner> {
+    #[inline]
+    fn as_socket(&self) -> BorrowedSocket<'_> {
+        self.inner.as_ref().unwrap().as_socket()
+    }
+}
+
+#[cfg(windows)]
+impl<Inner: HalfDuplex + AsHandleOrSocket> AsHandleOrSocket for BufDuplexerBackend<Inner> {
+    #[inline]
+    fn as_handle_or_socket(&self) -> BorrowedHandleOrSocket<'_> {
+        self.inner.as_ref().unwrap().as_handle_or_socket()
     }
 }
 

@@ -14,24 +14,26 @@ use async_std::{
 #[cfg(feature = "char-device")]
 use char_device::AsyncStdCharDevice;
 use duplex::Duplex;
+use io_lifetimes::{FromFilelike, FromSocketlike, IntoFilelike, IntoSocketlike};
 use std::{
     fmt::{self, Debug},
     pin::Pin,
     task::{Context, Poll},
 };
 use system_interface::io::ReadReady;
-#[cfg(not(windows))]
-use unsafe_io::os::posish::AsRawReadWriteFd;
 #[cfg(windows)]
 use unsafe_io::os::windows::{
-    AsRawHandleOrSocket, AsRawReadWriteHandleOrSocket, RawHandleOrSocket,
+    AsHandleOrSocket, AsRawHandleOrSocket, AsRawReadWriteHandleOrSocket, AsReadWriteHandleOrSocket,
+    BorrowedHandleOrSocket, RawHandleOrSocket,
 };
-use unsafe_io::{
-    AsUnsafeHandle, AsUnsafeReadWriteHandle, FromUnsafeFile, FromUnsafeSocket, IntoUnsafeFile,
-    IntoUnsafeSocket,
-};
+use unsafe_io::{AsRawGrip, AsRawReadWriteGrip};
 #[cfg(all(not(target_os = "wasi"), feature = "socketpair"))]
 use {duplex::HalfDuplex, socketpair::AsyncStdSocketpairStream};
+#[cfg(not(windows))]
+use {
+    io_lifetimes::{AsFd, BorrowedFd},
+    unsafe_io::os::posish::{AsRawReadWriteFd, AsReadWriteFd},
+};
 #[cfg(not(target_os = "wasi"))]
 use {
     os_pipe::{PipeReader, PipeWriter},
@@ -186,11 +188,11 @@ impl AsyncStreamReader {
     /// This method can be passed a [`async_std::fs::File`] or similar `File` types.
     #[inline]
     #[must_use]
-    pub fn file<Filelike: IntoUnsafeFile + Read + Write + Seek>(filelike: Filelike) -> Self {
+    pub fn file<Filelike: IntoFilelike + Read + Write + Seek>(filelike: Filelike) -> Self {
         // Safety: We don't implement `From`/`Into` to allow the inner `File`
         // to be extracted, so we don't need to worry that we're granting
         // ambient authorities here.
-        Self::_file(File::from_filelike(filelike))
+        Self::_file(File::from_into_filelike(filelike))
     }
 
     #[inline]
@@ -205,8 +207,8 @@ impl AsyncStreamReader {
     /// `TcpStream` types.
     #[inline]
     #[must_use]
-    pub fn tcp_stream<Socketlike: IntoUnsafeSocket>(socketlike: Socketlike) -> Self {
-        Self::_tcp_stream(TcpStream::from_socketlike(socketlike))
+    pub fn tcp_stream<Socketlike: IntoSocketlike>(socketlike: Socketlike) -> Self {
+        Self::_tcp_stream(TcpStream::from_into_socketlike(socketlike))
     }
 
     #[inline]
@@ -304,11 +306,11 @@ impl AsyncStreamWriter {
     /// This method can be passed a [`async_std::fs::File`] or similar `File` types.
     #[inline]
     #[must_use]
-    pub fn file<Filelike: IntoUnsafeFile + Read + Write + Seek>(filelike: Filelike) -> Self {
+    pub fn file<Filelike: IntoFilelike + Read + Write + Seek>(filelike: Filelike) -> Self {
         // Safety: We don't implement `From`/`Into` to allow the inner `File`
         // to be extracted, so we don't need to worry that we're granting
         // ambient authorities here.
-        Self::_file(File::from_filelike(filelike))
+        Self::_file(File::from_into_filelike(filelike))
     }
 
     #[inline]
@@ -323,11 +325,11 @@ impl AsyncStreamWriter {
     /// `TcpStream` types.
     #[inline]
     #[must_use]
-    pub fn tcp_stream<Socketlike: IntoUnsafeSocket>(socketlike: Socketlike) -> Self {
+    pub fn tcp_stream<Socketlike: IntoSocketlike>(socketlike: Socketlike) -> Self {
         // Safety: We don't implement `From`/`Into` to allow the inner
         // `TcpStream` to be extracted, so we don't need to worry that we're
         // granting ambient authorities here.
-        Self::_tcp_stream(TcpStream::from_socketlike(socketlike))
+        Self::_tcp_stream(TcpStream::from_into_socketlike(socketlike))
     }
 
     #[inline]
@@ -432,8 +434,8 @@ impl AsyncStreamDuplexer {
     /// `TcpStream` types.
     #[inline]
     #[must_use]
-    pub fn tcp_stream<Socketlike: IntoUnsafeSocket>(socketlike: Socketlike) -> Self {
-        Self::_tcp_stream(TcpStream::from_socketlike(socketlike))
+    pub fn tcp_stream<Socketlike: IntoSocketlike>(socketlike: Socketlike) -> Self {
+        Self::_tcp_stream(TcpStream::from_into_socketlike(socketlike))
     }
 
     #[inline]
@@ -763,8 +765,10 @@ impl Read for AsyncStreamDuplexer {
             DuplexResources::SocketpairStream(socketpair_stream) => {
                 Pin::new(socketpair_stream).poll_read(cx, buf)
             }
-            DuplexResources::PipeReaderWriter(_)
-            | DuplexResources::SocketedThreadFunc(_)
+            #[cfg(not(target_os = "wasi"))]
+            DuplexResources::PipeReaderWriter(_) => todo!("async duplex resources"),
+            #[cfg(all(not(target_os = "wasi"), feature = "socketpair"))]
+            DuplexResources::SocketedThreadFunc(_)
             | DuplexResources::SocketedThread(_)
             | DuplexResources::SocketedThreadReadReady(_) => todo!("async duplex resources"),
         }
@@ -1186,13 +1190,9 @@ impl AsRawReadWriteHandleOrSocket for AsyncStreamDuplexer {
     #[inline]
     fn as_raw_write_handle_or_socket(&self) -> RawHandleOrSocket {
         match &self.resources {
-            DuplexResources::TcpStream(tcp_stream) => {
-                Pin::new(tcp_stream).as_raw_handle_or_socket()
-            }
+            DuplexResources::TcpStream(tcp_stream) => tcp_stream.as_raw_handle_or_socket(),
             #[cfg(unix)]
-            DuplexResources::UnixStream(unix_stream) => {
-                Pin::new(unix_stream).as_raw_handle_or_socket()
-            }
+            DuplexResources::UnixStream(unix_stream) => unix_stream.as_raw_handle_or_socket(),
             DuplexResources::StdinStdout(_stdin_stdout) => {
                 todo!("async stdout as_raw_handle_or_socket")
             }
@@ -1203,12 +1203,218 @@ impl AsRawReadWriteHandleOrSocket for AsyncStreamDuplexer {
                 todo!("async child stdout/stdin as_raw_handle_or_socket")
             }
             #[cfg(feature = "char-device")]
-            DuplexResources::CharDevice(char_device) => {
-                Pin::new(char_device).as_raw_handle_or_socket()
-            }
+            DuplexResources::CharDevice(char_device) => char_device.as_raw_handle_or_socket(),
             #[cfg(feature = "socketpair")]
             DuplexResources::SocketpairStream(socketpair_stream) => {
-                Pin::new(socketpair_stream).as_raw_handle_or_socket()
+                socketpair_stream.as_raw_handle_or_socket()
+            }
+            DuplexResources::PipeReaderWriter(_)
+            | DuplexResources::SocketedThreadFunc(_)
+            | DuplexResources::SocketedThread(_)
+            | DuplexResources::SocketedThreadReadReady(_) => todo!("async duplex resources"),
+        }
+    }
+}
+
+#[cfg(not(windows))]
+impl AsFd for AsyncStreamReader {
+    #[inline]
+    fn as_fd(&self) -> BorrowedFd<'_> {
+        match &self.resources {
+            ReadResources::File(file) => file.as_fd(),
+            ReadResources::TcpStream(tcp_stream) => tcp_stream.as_fd(),
+            #[cfg(unix)]
+            ReadResources::UnixStream(unix_stream) => unix_stream.as_fd(),
+            ReadResources::PipeReader(_pipe_reader) => todo!("async pipe as_fd"),
+            ReadResources::Stdin(_stdin) => todo!("async stdin as_fd"),
+            #[cfg(not(target_os = "wasi"))]
+            ReadResources::PipedThread(_piped_thread) => todo!("async piped_thread as_fd"),
+            #[cfg(not(target_os = "wasi"))]
+            ReadResources::Child(_child) => todo!("async child as_fd"),
+            #[cfg(not(target_os = "wasi"))]
+            ReadResources::ChildStdout(_child_stdout) => todo!("async child stdout as_fd"),
+            #[cfg(not(target_os = "wasi"))]
+            ReadResources::ChildStderr(_child_stderr) => todo!("async child stderr as_fd"),
+        }
+    }
+}
+
+#[cfg(not(windows))]
+impl AsFd for AsyncStreamWriter {
+    #[inline]
+    fn as_fd(&self) -> BorrowedFd<'_> {
+        match &self.resources {
+            WriteResources::File(file) => file.as_fd(),
+            WriteResources::TcpStream(tcp_stream) => tcp_stream.as_fd(),
+            #[cfg(unix)]
+            WriteResources::UnixStream(unix_stream) => unix_stream.as_fd(),
+            WriteResources::PipeWriter(_pipe_writer) => todo!("async pipe as_fd"),
+            WriteResources::Stdout(_stdout) => todo!("async stdout as_fd"),
+            #[cfg(not(target_os = "wasi"))]
+            WriteResources::PipedThread(_piped_thread) => todo!("async piped_thread as_fd"),
+            #[cfg(not(target_os = "wasi"))]
+            WriteResources::Child(_child) => todo!("async child as_fd"),
+            #[cfg(not(target_os = "wasi"))]
+            WriteResources::ChildStdin(_child_stdin) => todo!("async child stdin as_fd"),
+        }
+    }
+}
+
+#[cfg(not(windows))]
+impl AsReadWriteFd for AsyncStreamDuplexer {
+    #[inline]
+    fn as_read_fd(&self) -> BorrowedFd<'_> {
+        match &self.resources {
+            DuplexResources::TcpStream(tcp_stream) => tcp_stream.as_fd(),
+            #[cfg(unix)]
+            DuplexResources::UnixStream(unix_stream) => unix_stream.as_fd(),
+            DuplexResources::StdinStdout(_stdin_stdout) => todo!("async stdout as_read_fd"),
+            #[cfg(not(target_os = "wasi"))]
+            DuplexResources::Child(_child) => todo!("async child as_read_fd"),
+            #[cfg(not(target_os = "wasi"))]
+            DuplexResources::ChildStdoutStdin(_stdout_stdin) => {
+                todo!("async child stdout/stdin as_read_fd")
+            }
+            #[cfg(feature = "char-device")]
+            DuplexResources::CharDevice(char_device) => char_device.as_fd(),
+            #[cfg(feature = "socketpair")]
+            DuplexResources::SocketpairStream(socketpair_stream) => socketpair_stream.as_fd(),
+            DuplexResources::PipeReaderWriter(_)
+            | DuplexResources::SocketedThreadFunc(_)
+            | DuplexResources::SocketedThread(_)
+            | DuplexResources::SocketedThreadReadReady(_) => todo!("async duplex resources"),
+        }
+    }
+
+    #[inline]
+    fn as_write_fd(&self) -> BorrowedFd<'_> {
+        match &self.resources {
+            DuplexResources::TcpStream(tcp_stream) => tcp_stream.as_fd(),
+            #[cfg(unix)]
+            DuplexResources::UnixStream(unix_stream) => unix_stream.as_fd(),
+            DuplexResources::StdinStdout(_stdin_stdout) => todo!("async stdout as_write_fd"),
+            #[cfg(not(target_os = "wasi"))]
+            DuplexResources::Child(_child) => todo!("async child as_write_fd"),
+            #[cfg(not(target_os = "wasi"))]
+            DuplexResources::ChildStdoutStdin(_stdout_stdin) => {
+                todo!("async child stdout/stdin as_write_fd")
+            }
+            #[cfg(feature = "char-device")]
+            DuplexResources::CharDevice(char_device) => char_device.as_fd(),
+            #[cfg(feature = "socketpair")]
+            DuplexResources::SocketpairStream(socketpair_stream) => socketpair_stream.as_fd(),
+            DuplexResources::PipeReaderWriter(_)
+            | DuplexResources::SocketedThreadFunc(_)
+            | DuplexResources::SocketedThread(_)
+            | DuplexResources::SocketedThreadReadReady(_) => todo!("async duplex resources"),
+        }
+    }
+}
+
+#[cfg(windows)]
+impl AsHandleOrSocket for AsyncStreamReader {
+    #[inline]
+    fn as_handle_or_socket(&self) -> BorrowedHandleOrSocket<'_> {
+        match &self.resources {
+            ReadResources::File(file) => file.as_handle_or_socket(),
+            ReadResources::TcpStream(tcp_stream) => tcp_stream.as_handle_or_socket(),
+            #[cfg(unix)]
+            ReadResources::UnixStream(unix_stream) => unix_stream.as_handle_or_socket(),
+            ReadResources::PipeReader(_pipe_reader) => todo!("async pipe as_handle_or_socket"),
+            ReadResources::Stdin(_stdin) => todo!("async stdin as_handle_or_socket"),
+            #[cfg(not(target_os = "wasi"))]
+            ReadResources::PipedThread(_piped_thread) => {
+                todo!("async piped_thread as_handle_or_socket")
+            }
+            #[cfg(not(target_os = "wasi"))]
+            ReadResources::Child(_child) => todo!("async child as_handle_or_socket"),
+            #[cfg(not(target_os = "wasi"))]
+            ReadResources::ChildStdout(_child_stdout) => {
+                todo!("async child stdout as_handle_or_socket")
+            }
+            #[cfg(not(target_os = "wasi"))]
+            ReadResources::ChildStderr(_child_stderr) => {
+                todo!("async child stderr as_handle_or_socket")
+            }
+        }
+    }
+}
+
+#[cfg(windows)]
+impl AsHandleOrSocket for AsyncStreamWriter {
+    #[inline]
+    fn as_handle_or_socket(&self) -> BorrowedHandleOrSocket<'_> {
+        match &self.resources {
+            WriteResources::File(file) => file.as_handle_or_socket(),
+            WriteResources::TcpStream(tcp_stream) => tcp_stream.as_handle_or_socket(),
+            #[cfg(unix)]
+            WriteResources::UnixStream(unix_stream) => unix_stream.as_handle_or_socket(),
+            WriteResources::PipeWriter(_pipe_writer) => todo!("async pipe as_handle_or_socket"),
+            WriteResources::Stdout(_stdout) => todo!("async stdout as_handle_or_socket"),
+            #[cfg(not(target_os = "wasi"))]
+            WriteResources::PipedThread(_piped_thread) => {
+                todo!("async piped_thread as_handle_or_socket")
+            }
+            #[cfg(not(target_os = "wasi"))]
+            WriteResources::Child(_child) => todo!("async child as_handle_or_socket"),
+            #[cfg(not(target_os = "wasi"))]
+            WriteResources::ChildStdin(_child_stdin) => {
+                todo!("async child stdin as_handle_or_socket")
+            }
+        }
+    }
+}
+
+#[cfg(windows)]
+impl AsReadWriteHandleOrSocket for AsyncStreamDuplexer {
+    #[inline]
+    fn as_read_handle_or_socket(&self) -> BorrowedHandleOrSocket<'_> {
+        match &self.resources {
+            DuplexResources::TcpStream(tcp_stream) => tcp_stream.as_handle_or_socket(),
+            #[cfg(unix)]
+            DuplexResources::UnixStream(unix_stream) => unix_stream.as_handle_or_socket(),
+            DuplexResources::StdinStdout(_stdin_stdout) => {
+                todo!("async stdout as_handle_or_socket")
+            }
+            #[cfg(not(target_os = "wasi"))]
+            DuplexResources::Child(_child) => todo!("async child as_handle_or_socket"),
+            #[cfg(not(target_os = "wasi"))]
+            DuplexResources::ChildStdoutStdin(_stdout_stdin) => {
+                todo!("async child stdout/stdin as_handle_or_socket")
+            }
+            #[cfg(feature = "char-device")]
+            DuplexResources::CharDevice(char_device) => char_device.as_handle_or_socket(),
+            #[cfg(feature = "socketpair")]
+            DuplexResources::SocketpairStream(socketpair_stream) => {
+                socketpair_stream.as_handle_or_socket()
+            }
+            DuplexResources::PipeReaderWriter(_)
+            | DuplexResources::SocketedThreadFunc(_)
+            | DuplexResources::SocketedThread(_)
+            | DuplexResources::SocketedThreadReadReady(_) => todo!("async duplex resources"),
+        }
+    }
+
+    #[inline]
+    fn as_write_handle_or_socket(&self) -> BorrowedHandleOrSocket<'_> {
+        match &self.resources {
+            DuplexResources::TcpStream(tcp_stream) => tcp_stream.as_handle_or_socket(),
+            #[cfg(unix)]
+            DuplexResources::UnixStream(unix_stream) => unix_stream.as_handle_or_socket(),
+            DuplexResources::StdinStdout(_stdin_stdout) => {
+                todo!("async stdout as_handle_or_socket")
+            }
+            #[cfg(not(target_os = "wasi"))]
+            DuplexResources::Child(_child) => todo!("async child as_handle_or_socket"),
+            #[cfg(not(target_os = "wasi"))]
+            DuplexResources::ChildStdoutStdin(_stdout_stdin) => {
+                todo!("async child stdout/stdin as_handle_or_socket")
+            }
+            #[cfg(feature = "char-device")]
+            DuplexResources::CharDevice(char_device) => char_device.as_handle_or_socket(),
+            #[cfg(feature = "socketpair")]
+            DuplexResources::SocketpairStream(socketpair_stream) => {
+                socketpair_stream.as_handle_or_socket()
             }
             DuplexResources::PipeReaderWriter(_)
             | DuplexResources::SocketedThreadFunc(_)
@@ -1275,7 +1481,7 @@ impl Debug for AsyncStreamReader {
         // information about it, because this information is otherwise
         // unavailable to safe Rust code.
         f.debug_struct("AsyncStreamReader")
-            .field("unsafe_handle", &self.as_unsafe_handle())
+            .field("raw_grip", &self.as_raw_grip())
             .finish()
     }
 }
@@ -1286,7 +1492,7 @@ impl Debug for AsyncStreamWriter {
         // information about it, because this information is otherwise
         // unavailable to safe Rust code.
         f.debug_struct("AsyncStreamWriter")
-            .field("unsafe_handle", &self.as_unsafe_handle())
+            .field("raw_grip", &self.as_raw_grip())
             .finish()
     }
 }
@@ -1297,8 +1503,8 @@ impl Debug for AsyncStreamDuplexer {
         // information about it, because this information is otherwise
         // unavailable to safe Rust code.
         f.debug_struct("AsyncStreamDuplexer")
-            .field("unsafe_readable", &self.as_unsafe_read_handle())
-            .field("unsafe_writeable", &self.as_unsafe_write_handle())
+            .field("raw_read_grip", &self.as_raw_read_grip())
+            .field("raw_write_grip", &self.as_raw_write_grip())
             .finish()
     }
 }

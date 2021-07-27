@@ -2,6 +2,7 @@ use crate::lockers::{StdinLocker, StdoutLocker};
 #[cfg(feature = "char-device")]
 use char_device::TokioCharDevice;
 use duplex::Duplex;
+use io_lifetimes::{FromFilelike, IntoFilelike};
 #[cfg(target_os = "wasi")]
 use std::os::wasi::io::{AsRawFd, RawFd};
 use std::{
@@ -16,15 +17,19 @@ use tokio::{
     io::{self, AsyncRead, AsyncSeek, AsyncWrite, ReadBuf},
     net::TcpStream,
 };
-#[cfg(not(windows))]
-use unsafe_io::os::posish::AsRawReadWriteFd;
 #[cfg(windows)]
 use unsafe_io::os::windows::{
-    AsRawHandleOrSocket, AsRawReadWriteHandleOrSocket, RawHandleOrSocket,
+    AsHandleOrSocket, AsRawHandleOrSocket, AsRawReadWriteHandleOrSocket, AsReadWriteHandleOrSocket,
+    BorrowedHandleOrSocket, RawHandleOrSocket,
 };
-use unsafe_io::{AsUnsafeHandle, AsUnsafeReadWriteHandle, FromUnsafeFile, IntoUnsafeFile};
+use unsafe_io::{AsRawGrip, AsRawReadWriteGrip};
 #[cfg(all(not(target_os = "wasi"), feature = "socketpair"))]
 use {duplex::HalfDuplex, socketpair::TokioSocketpairStream};
+#[cfg(not(windows))]
+use {
+    io_lifetimes::{AsFd, BorrowedFd},
+    unsafe_io::os::posish::{AsRawReadWriteFd, AsReadWriteFd},
+};
 #[cfg(not(target_os = "wasi"))]
 use {
     os_pipe::{PipeReader, PipeWriter},
@@ -189,13 +194,13 @@ impl TokioStreamReader {
     /// This method can be passed a [`tokio::fs::File`] or similar `File` types.
     #[inline]
     #[must_use]
-    pub fn file<Filelike: IntoUnsafeFile + AsyncRead + AsyncWrite + AsyncSeek>(
+    pub fn file<Filelike: IntoFilelike + AsyncRead + AsyncWrite + AsyncSeek>(
         filelike: Filelike,
     ) -> Self {
         // Safety: We don't implement `From`/`Into` to allow the inner `File`
         // to be extracted, so we don't need to worry that we're granting
         // ambient authorities here.
-        Self::_file(File::from_filelike(filelike))
+        Self::_file(File::from_into_filelike(filelike))
     }
 
     #[inline]
@@ -309,13 +314,13 @@ impl TokioStreamWriter {
     /// This method can be passed a [`tokio::fs::File`] or similar `File` types.
     #[inline]
     #[must_use]
-    pub fn file<Filelike: IntoUnsafeFile + AsyncRead + AsyncWrite + AsyncSeek>(
+    pub fn file<Filelike: IntoFilelike + AsyncRead + AsyncWrite + AsyncSeek>(
         filelike: Filelike,
     ) -> Self {
         // Safety: We don't implement `From`/`Into` to allow the inner `File`
         // to be extracted, so we don't need to worry that we're granting
         // ambient authorities here.
-        Self::_file(File::from_filelike(filelike))
+        Self::_file(File::from_into_filelike(filelike))
     }
 
     #[inline]
@@ -740,8 +745,10 @@ impl AsyncRead for TokioStreamDuplexer {
             DuplexResources::SocketpairStream(socketpair_stream) => {
                 Pin::new(socketpair_stream).poll_read(cx, buf)
             }
-            DuplexResources::PipeReaderWriter(_)
-            | DuplexResources::SocketedThreadFunc(_)
+            #[cfg(not(target_os = "wasi"))]
+            DuplexResources::PipeReaderWriter(_) => todo!("tokio duplex resources"),
+            #[cfg(all(not(target_os = "wasi"), feature = "socketpair"))]
+            DuplexResources::SocketedThreadFunc(_)
             | DuplexResources::SocketedThread(_)
             | DuplexResources::SocketedThreadReadReady(_) => todo!("tokio duplex resources"),
         }
@@ -836,8 +843,10 @@ impl AsyncWrite for TokioStreamDuplexer {
             DuplexResources::SocketpairStream(socketpair_stream) => {
                 Pin::new(socketpair_stream).poll_write(cx, buf)
             }
-            DuplexResources::PipeReaderWriter(_)
-            | DuplexResources::SocketedThreadFunc(_)
+            #[cfg(not(target_os = "wasi"))]
+            DuplexResources::PipeReaderWriter(_) => todo!("tokio duplex resources"),
+            #[cfg(all(not(target_os = "wasi"), feature = "socketpair"))]
+            DuplexResources::SocketedThreadFunc(_)
             | DuplexResources::SocketedThread(_)
             | DuplexResources::SocketedThreadReadReady(_) => todo!("tokio duplex resources"),
         }
@@ -1159,6 +1168,214 @@ impl AsRawReadWriteHandleOrSocket for TokioStreamDuplexer {
     }
 }
 
+#[cfg(not(windows))]
+impl AsFd for TokioStreamReader {
+    #[inline]
+    fn as_fd(&self) -> BorrowedFd<'_> {
+        match &self.resources {
+            ReadResources::File(file) => file.as_fd(),
+            ReadResources::TcpStream(tcp_stream) => tcp_stream.as_fd(),
+            #[cfg(unix)]
+            ReadResources::UnixStream(unix_stream) => unix_stream.as_fd(),
+            ReadResources::PipeReader(_pipe_reader) => todo!("tokio pipe as_fd"),
+            ReadResources::Stdin(_stdin) => todo!("tokio stdin as_fd"),
+            #[cfg(not(target_os = "wasi"))]
+            ReadResources::PipedThread(_piped_thread) => todo!("tokio piped_thread as_fd"),
+            #[cfg(not(target_os = "wasi"))]
+            ReadResources::Child(_child) => todo!("tokio child as_fd"),
+            #[cfg(not(target_os = "wasi"))]
+            ReadResources::ChildStdout(_child_stdout) => todo!("tokio child stdout as_fd"),
+            #[cfg(not(target_os = "wasi"))]
+            ReadResources::ChildStderr(_child_stderr) => todo!("tokio child stderr as_fd"),
+        }
+    }
+}
+
+#[cfg(not(windows))]
+impl AsFd for TokioStreamWriter {
+    #[inline]
+    fn as_fd(&self) -> BorrowedFd<'_> {
+        match &self.resources {
+            WriteResources::File(file) => file.as_fd(),
+            WriteResources::TcpStream(tcp_stream) => tcp_stream.as_fd(),
+            #[cfg(unix)]
+            WriteResources::UnixStream(unix_stream) => unix_stream.as_fd(),
+            WriteResources::PipeWriter(_pipe_writer) => todo!("tokio pipe as_fd"),
+            WriteResources::Stdout(_stdout) => todo!("tokio stdout as_fd"),
+            #[cfg(not(target_os = "wasi"))]
+            WriteResources::PipedThread(_piped_thread) => todo!("tokio piped_thread as_fd"),
+            #[cfg(not(target_os = "wasi"))]
+            WriteResources::Child(_child) => todo!("tokio child as_fd"),
+            #[cfg(not(target_os = "wasi"))]
+            WriteResources::ChildStdin(_child_stdin) => todo!("tokio child stdin as_fd"),
+        }
+    }
+}
+
+#[cfg(not(windows))]
+impl AsReadWriteFd for TokioStreamDuplexer {
+    #[inline]
+    fn as_read_fd(&self) -> BorrowedFd<'_> {
+        match &self.resources {
+            DuplexResources::TcpStream(tcp_stream) => tcp_stream.as_fd(),
+            #[cfg(unix)]
+            DuplexResources::UnixStream(unix_stream) => unix_stream.as_fd(),
+            DuplexResources::StdinStdout(_stdin_stdout) => todo!("tokio stdout as_read_fd"),
+            #[cfg(not(target_os = "wasi"))]
+            DuplexResources::Child(_child) => todo!("tokio child as_read_fd"),
+            #[cfg(not(target_os = "wasi"))]
+            DuplexResources::ChildStdoutStdin(_stdout_stdin) => {
+                todo!("tokio child stdout/stdin as_read_fd")
+            }
+            #[cfg(feature = "char-device")]
+            DuplexResources::CharDevice(char_device) => char_device.as_fd(),
+            #[cfg(feature = "socketpair")]
+            DuplexResources::SocketpairStream(socketpair_stream) => socketpair_stream.as_fd(),
+            DuplexResources::PipeReaderWriter(_)
+            | DuplexResources::SocketedThreadFunc(_)
+            | DuplexResources::SocketedThread(_)
+            | DuplexResources::SocketedThreadReadReady(_) => todo!("tokio duplex resources"),
+        }
+    }
+
+    #[inline]
+    fn as_write_fd(&self) -> BorrowedFd<'_> {
+        match &self.resources {
+            DuplexResources::TcpStream(tcp_stream) => tcp_stream.as_fd(),
+            #[cfg(unix)]
+            DuplexResources::UnixStream(unix_stream) => unix_stream.as_fd(),
+            DuplexResources::StdinStdout(_stdin_stdout) => todo!("tokio stdout as_write_fd"),
+            #[cfg(not(target_os = "wasi"))]
+            DuplexResources::Child(_child) => todo!("tokio child as_write_fd"),
+            #[cfg(not(target_os = "wasi"))]
+            DuplexResources::ChildStdoutStdin(_stdout_stdin) => {
+                todo!("tokio child stdout/stdin as_write_fd")
+            }
+            #[cfg(feature = "char-device")]
+            DuplexResources::CharDevice(char_device) => char_device.as_fd(),
+            #[cfg(feature = "socketpair")]
+            DuplexResources::SocketpairStream(socketpair_stream) => socketpair_stream.as_fd(),
+            DuplexResources::PipeReaderWriter(_)
+            | DuplexResources::SocketedThreadFunc(_)
+            | DuplexResources::SocketedThread(_)
+            | DuplexResources::SocketedThreadReadReady(_) => todo!("tokio duplex resources"),
+        }
+    }
+}
+
+#[cfg(windows)]
+impl AsHandleOrSocket for TokioStreamReader {
+    #[inline]
+    fn as_handle_or_socket(&self) -> BorrowedHandleOrSocket<'_> {
+        match &self.resources {
+            ReadResources::File(file) => file.as_handle_or_socket(),
+            ReadResources::TcpStream(tcp_stream) => tcp_stream.as_handle_or_socket(),
+            #[cfg(unix)]
+            ReadResources::UnixStream(unix_stream) => unix_stream.as_handle_or_socket(),
+            ReadResources::PipeReader(_pipe_reader) => todo!("tokio pipe as_handle_or_socket"),
+            ReadResources::Stdin(_stdin) => todo!("tokio stdin as_handle_or_socket"),
+            #[cfg(not(target_os = "wasi"))]
+            ReadResources::PipedThread(_piped_thread) => {
+                todo!("tokio piped_thread as_handle_or_socket")
+            }
+            #[cfg(not(target_os = "wasi"))]
+            ReadResources::Child(_child) => todo!("tokio child as_handle_or_socket"),
+            #[cfg(not(target_os = "wasi"))]
+            ReadResources::ChildStdout(_child_stdout) => {
+                todo!("tokio child stdout as_handle_or_socket")
+            }
+            #[cfg(not(target_os = "wasi"))]
+            ReadResources::ChildStderr(_child_stderr) => {
+                todo!("tokio child stderr as_handle_or_socket")
+            }
+        }
+    }
+}
+
+#[cfg(windows)]
+impl AsHandleOrSocket for TokioStreamWriter {
+    #[inline]
+    fn as_handle_or_socket(&self) -> BorrowedHandleOrSocket<'_> {
+        match &self.resources {
+            WriteResources::File(file) => file.as_handle_or_socket(),
+            WriteResources::TcpStream(tcp_stream) => tcp_stream.as_handle_or_socket(),
+            #[cfg(unix)]
+            WriteResources::UnixStream(unix_stream) => unix_stream.as_handle_or_socket(),
+            WriteResources::PipeWriter(_pipe_writer) => todo!("tokio pipe as_handle_or_socket"),
+            WriteResources::Stdout(_stdout) => todo!("tokio stdout as_handle_or_socket"),
+            #[cfg(not(target_os = "wasi"))]
+            WriteResources::PipedThread(_piped_thread) => {
+                todo!("tokio piped_thread as_handle_or_socket")
+            }
+            #[cfg(not(target_os = "wasi"))]
+            WriteResources::Child(_child) => todo!("tokio child as_handle_or_socket"),
+            #[cfg(not(target_os = "wasi"))]
+            WriteResources::ChildStdin(_child_stdin) => {
+                todo!("tokio child stdin as_handle_or_socket")
+            }
+        }
+    }
+}
+
+#[cfg(windows)]
+impl AsReadWriteHandleOrSocket for TokioStreamDuplexer {
+    #[inline]
+    fn as_read_handle_or_socket(&self) -> BorrowedHandleOrSocket<'_> {
+        match &self.resources {
+            DuplexResources::TcpStream(tcp_stream) => tcp_stream.as_handle_or_socket(),
+            #[cfg(unix)]
+            DuplexResources::UnixStream(unix_stream) => unix_stream.as_handle_or_socket(),
+            DuplexResources::StdinStdout(_stdin_stdout) => {
+                todo!("tokio stdout as_handle_or_socket")
+            }
+            #[cfg(not(target_os = "wasi"))]
+            DuplexResources::Child(_child) => todo!("tokio child as_handle_or_socket"),
+            #[cfg(not(target_os = "wasi"))]
+            DuplexResources::ChildStdoutStdin(_stdout_stdin) => {
+                todo!("tokio child stdout/stdin as_handle_or_socket")
+            }
+            #[cfg(feature = "char-device")]
+            DuplexResources::CharDevice(char_device) => char_device.as_handle_or_socket(),
+            #[cfg(feature = "socketpair")]
+            DuplexResources::SocketpairStream(socketpair_stream) => {
+                socketpair_stream.as_handle_or_socket()
+            }
+            DuplexResources::PipeReaderWriter(_)
+            | DuplexResources::SocketedThreadFunc(_)
+            | DuplexResources::SocketedThread(_)
+            | DuplexResources::SocketedThreadReadReady(_) => todo!("tokio duplex resources"),
+        }
+    }
+
+    #[inline]
+    fn as_write_handle_or_socket(&self) -> BorrowedHandleOrSocket<'_> {
+        match &self.resources {
+            DuplexResources::TcpStream(tcp_stream) => tcp_stream.as_handle_or_socket(),
+            #[cfg(unix)]
+            DuplexResources::UnixStream(unix_stream) => unix_stream.as_handle_or_socket(),
+            DuplexResources::StdinStdout(_stdin_stdout) => {
+                todo!("tokio stdout as_handle_or_socket")
+            }
+            #[cfg(not(target_os = "wasi"))]
+            DuplexResources::Child(_child) => todo!("tokio child as_handle_or_socket"),
+            #[cfg(not(target_os = "wasi"))]
+            DuplexResources::ChildStdoutStdin(_stdout_stdin) => {
+                todo!("tokio child stdout/stdin as_handle_or_socket")
+            }
+            #[cfg(feature = "char-device")]
+            DuplexResources::CharDevice(char_device) => char_device.as_handle_or_socket(),
+            #[cfg(feature = "socketpair")]
+            DuplexResources::SocketpairStream(socketpair_stream) => {
+                socketpair_stream.as_handle_or_socket()
+            }
+            DuplexResources::PipeReaderWriter(_)
+            | DuplexResources::SocketedThreadFunc(_)
+            | DuplexResources::SocketedThread(_)
+            | DuplexResources::SocketedThreadReadReady(_) => todo!("tokio duplex resources"),
+        }
+    }
+}
+
 impl Drop for ReadResources {
     fn drop(&mut self) {
         match self {
@@ -1216,7 +1433,7 @@ impl Debug for TokioStreamReader {
         // information about it, because this information is otherwise
         // unavailable to safe Rust code.
         f.debug_struct("TokioStreamReader")
-            .field("unsafe_handle", &self.as_unsafe_handle())
+            .field("raw_grip", &self.as_raw_grip())
             .finish()
     }
 }
@@ -1227,7 +1444,7 @@ impl Debug for TokioStreamWriter {
         // information about it, because this information is otherwise
         // unavailable to safe Rust code.
         f.debug_struct("TokioStreamWriter")
-            .field("unsafe_handle", &self.as_unsafe_handle())
+            .field("raw_grip", &self.as_raw_grip())
             .finish()
     }
 }
@@ -1238,8 +1455,8 @@ impl Debug for TokioStreamDuplexer {
         // information about it, because this information is otherwise
         // unavailable to safe Rust code.
         f.debug_struct("TokioStreamDuplexer")
-            .field("unsafe_readable", &self.as_unsafe_read_handle())
-            .field("unsafe_writeable", &self.as_unsafe_write_handle())
+            .field("raw_read_grip", &self.as_raw_read_grip())
+            .field("raw_write_grip", &self.as_raw_write_grip())
             .finish()
     }
 }

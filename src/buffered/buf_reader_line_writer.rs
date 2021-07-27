@@ -12,11 +12,17 @@ use std::{
     io::{self, BufRead, IoSlice, IoSliceMut, Read, Write},
 };
 #[cfg(not(windows))]
-use unsafe_io::os::posish::{AsRawFd, RawFd};
+use {
+    io_lifetimes::{AsFd, BorrowedFd},
+    unsafe_io::os::posish::{AsRawFd, RawFd},
+};
 #[cfg(windows)]
 use {
+    io_lifetimes::{AsHandle, AsSocket, BorrowedHandle, BorrowedSocket},
     std::os::windows::io::{AsRawHandle, AsRawSocket, RawHandle, RawSocket},
-    unsafe_io::os::windows::{AsRawHandleOrSocket, RawHandleOrSocket},
+    unsafe_io::os::windows::{
+        AsHandleOrSocket, AsRawHandleOrSocket, BorrowedHandleOrSocket, RawHandleOrSocket,
+    },
 };
 
 /// Wraps a reader and writer and buffers input and output to and from it, flushing
@@ -525,6 +531,70 @@ impl<Inner: HalfDuplex + AsRawHandleOrSocket> AsRawHandleOrSocket
     #[inline]
     fn as_raw_handle_or_socket(&self) -> RawHandleOrSocket {
         self.inner.as_raw_handle_or_socket()
+    }
+}
+
+#[cfg(not(windows))]
+impl<Inner: HalfDuplex + AsFd> AsFd for BufReaderLineWriter<Inner> {
+    #[inline]
+    fn as_fd(&self) -> BorrowedFd<'_> {
+        self.inner.as_fd()
+    }
+}
+
+#[cfg(windows)]
+impl<Inner: HalfDuplex + AsHandle> AsHandle for BufReaderLineWriter<Inner> {
+    #[inline]
+    fn as_handle(&self) -> BorrowedHandle<'_> {
+        self.inner.as_handle()
+    }
+}
+
+#[cfg(windows)]
+impl<Inner: HalfDuplex + AsSocket> AsSocket for BufReaderLineWriter<Inner> {
+    #[inline]
+    fn as_socket(&self) -> BorrowedSocket<'_> {
+        self.inner.as_socket()
+    }
+}
+
+#[cfg(windows)]
+impl<Inner: HalfDuplex + AsHandleOrSocket> AsHandleOrSocket for BufReaderLineWriter<Inner> {
+    #[inline]
+    fn as_handle_or_socket(&self) -> BorrowedHandleOrSocket<'_> {
+        self.inner.as_handle_or_socket()
+    }
+}
+
+#[cfg(not(windows))]
+impl<Inner: HalfDuplex + AsFd> AsFd for BufReaderLineWriterBackend<Inner> {
+    #[inline]
+    fn as_fd(&self) -> BorrowedFd<'_> {
+        self.inner.as_fd()
+    }
+}
+
+#[cfg(windows)]
+impl<Inner: HalfDuplex + AsHandle> AsHandle for BufReaderLineWriterBackend<Inner> {
+    #[inline]
+    fn as_handle(&self) -> BorrowedHandle<'_> {
+        self.inner.as_handle()
+    }
+}
+
+#[cfg(windows)]
+impl<Inner: HalfDuplex + AsSocket> AsSocket for BufReaderLineWriterBackend<Inner> {
+    #[inline]
+    fn as_socket(&self) -> BorrowedSocket<'_> {
+        self.inner.as_socket()
+    }
+}
+
+#[cfg(windows)]
+impl<Inner: HalfDuplex + AsHandleOrSocket> AsHandleOrSocket for BufReaderLineWriterBackend<Inner> {
+    #[inline]
+    fn as_handle_or_socket(&self) -> BorrowedHandleOrSocket<'_> {
+        self.inner.as_handle_or_socket()
     }
 }
 

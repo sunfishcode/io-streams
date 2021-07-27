@@ -1,5 +1,9 @@
 //! Hold locks for the process' stdin and stdout.
 
+use io_lifetimes::AsFilelike;
+#[cfg(not(windows))]
+use io_lifetimes::{AsFd, BorrowedFd};
+use os_pipe::PipeReader;
 use parking::{Parker, Unparker};
 #[cfg(unix)]
 use std::os::unix::io::{AsRawFd, RawFd};
@@ -11,11 +15,13 @@ use std::{
     thread::{self, JoinHandle},
 };
 use system_interface::io::ReadReady;
-use unsafe_io::{AsUnsafeFile, UnsafeFile};
 #[cfg(windows)]
 use {
+    io_lifetimes::{AsHandle, BorrowedHandle},
     std::os::windows::io::{AsRawHandle, RawHandle},
-    unsafe_io::os::windows::{AsRawHandleOrSocket, RawHandleOrSocket},
+    unsafe_io::os::windows::{
+        AsHandleOrSocket, AsRawHandleOrSocket, BorrowedHandleOrSocket, RawHandleOrSocket,
+    },
 };
 
 // Statically track whether stdin and stdout are claimed. This allows us to
@@ -37,7 +43,10 @@ const LOCKER_STACK_SIZE: usize = 32 * 1024;
 /// This class acquires a lock on `stdin` and prevents applications from
 /// accidentally accessing it through other means.
 pub(crate) struct StdinLocker {
-    unsafe_file: UnsafeFile,
+    #[cfg(not(windows))]
+    raw_fd: RawFd,
+    #[cfg(windows)]
+    raw_handle: RawHandle,
     unparker: Unparker,
     join_handle: Option<JoinHandle<()>>,
 }
@@ -45,7 +54,10 @@ pub(crate) struct StdinLocker {
 /// This class acquires a lock on `stdout` and prevents applications from
 /// accidentally accessing it through other means.
 pub(crate) struct StdoutLocker {
-    unsafe_file: UnsafeFile,
+    #[cfg(not(windows))]
+    raw_fd: RawFd,
+    #[cfg(windows)]
+    raw_handle: RawHandle,
     unparker: Unparker,
     join_handle: Option<JoinHandle<()>>,
 }
@@ -66,7 +78,10 @@ impl StdinLocker {
             let parker = Parker::new();
             let unparker = parker.unparker();
             let stdin = stdin();
-            let unsafe_file = stdin.as_unsafe_file();
+            #[cfg(not(windows))]
+            let raw_fd = stdin.as_raw_fd();
+            #[cfg(windows)]
+            let raw_handle = stdin.as_raw_handle();
             let join_handle = Some(
                 thread::Builder::new()
                     .name("ensure exclusive access to stdin".to_owned())
@@ -78,7 +93,10 @@ impl StdinLocker {
             );
 
             Ok(Self {
-                unsafe_file,
+                #[cfg(not(windows))]
+                raw_fd,
+                #[cfg(windows)]
+                raw_handle,
                 unparker,
                 join_handle,
             })
@@ -107,7 +125,10 @@ impl StdoutLocker {
             let parker = Parker::new();
             let unparker = parker.unparker();
             let stdout = stdout();
-            let unsafe_file = stdout.as_unsafe_file();
+            #[cfg(not(windows))]
+            let raw_fd = stdout.as_raw_fd();
+            #[cfg(windows)]
+            let raw_handle = stdout.as_raw_handle();
             let join_handle = Some(
                 thread::Builder::new()
                     .name("ensure exclusive access to stdout".to_owned())
@@ -119,7 +140,10 @@ impl StdoutLocker {
             );
 
             Ok(Self {
-                unsafe_file,
+                #[cfg(not(windows))]
+                raw_fd,
+                #[cfg(windows)]
+                raw_handle,
                 unparker,
                 join_handle,
             })
@@ -154,7 +178,7 @@ impl Drop for StdoutLocker {
 impl AsRawFd for StdinLocker {
     #[inline]
     fn as_raw_fd(&self) -> RawFd {
-        self.unsafe_file.as_raw_fd()
+        self.raw_fd
     }
 }
 
@@ -162,7 +186,7 @@ impl AsRawFd for StdinLocker {
 impl AsRawFd for StdoutLocker {
     #[inline]
     fn as_raw_fd(&self) -> RawFd {
-        self.unsafe_file.as_raw_fd()
+        self.raw_fd
     }
 }
 
@@ -170,7 +194,7 @@ impl AsRawFd for StdoutLocker {
 impl AsRawHandle for StdinLocker {
     #[inline]
     fn as_raw_handle(&self) -> RawHandle {
-        self.unsafe_file.as_raw_handle()
+        self.raw_handle
     }
 }
 
@@ -178,7 +202,7 @@ impl AsRawHandle for StdinLocker {
 impl AsRawHandle for StdoutLocker {
     #[inline]
     fn as_raw_handle(&self) -> RawHandle {
-        self.unsafe_file.as_raw_handle()
+        self.raw_handle
     }
 }
 
@@ -198,9 +222,65 @@ impl AsRawHandleOrSocket for StdoutLocker {
     }
 }
 
+#[cfg(not(windows))]
+impl AsFd for StdinLocker {
+    #[inline]
+    fn as_fd(&self) -> BorrowedFd<'_> {
+        unsafe { BorrowedFd::borrow_raw_fd(self.raw_fd) }
+    }
+}
+
+#[cfg(not(windows))]
+impl AsFd for StdoutLocker {
+    #[inline]
+    fn as_fd(&self) -> BorrowedFd<'_> {
+        unsafe { BorrowedFd::borrow_raw_fd(self.raw_fd) }
+    }
+}
+
+#[cfg(windows)]
+impl AsHandle for StdinLocker {
+    #[inline]
+    fn as_handle(&self) -> BorrowedHandle<'_> {
+        unsafe { BorrowedHandle::borrow_raw_handle(self.raw_handle) }
+    }
+}
+
+#[cfg(windows)]
+impl AsHandle for StdoutLocker {
+    #[inline]
+    fn as_handle(&self) -> BorrowedHandle<'_> {
+        unsafe { BorrowedHandle::borrow_raw_handle(self.raw_handle) }
+    }
+}
+
+#[cfg(windows)]
+impl AsHandleOrSocket for StdinLocker {
+    #[inline]
+    fn as_handle_or_socket(&self) -> BorrowedHandleOrSocket<'_> {
+        unsafe {
+            BorrowedHandleOrSocket::borrow_raw_handle_or_socket(
+                RawHandleOrSocket::unowned_from_raw_handle(self.raw_handle),
+            )
+        }
+    }
+}
+
+#[cfg(windows)]
+impl AsHandleOrSocket for StdoutLocker {
+    #[inline]
+    fn as_handle_or_socket(&self) -> BorrowedHandleOrSocket<'_> {
+        unsafe {
+            BorrowedHandleOrSocket::borrow_raw_handle_or_socket(
+                RawHandleOrSocket::unowned_from_raw_handle(self.raw_handle),
+            )
+        }
+    }
+}
+
 impl ReadReady for StdinLocker {
     #[inline]
     fn num_ready_bytes(&self) -> io::Result<u64> {
-        self.as_pipe_reader_view().num_ready_bytes()
+        self.as_filelike_view::<PipeReader>().num_ready_bytes()
     }
 }

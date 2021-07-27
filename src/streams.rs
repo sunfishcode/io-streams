@@ -2,6 +2,7 @@ use crate::lockers::{StdinLocker, StdoutLocker};
 #[cfg(feature = "char-device")]
 use char_device::CharDevice;
 use duplex::Duplex;
+use io_lifetimes::{FromFilelike, FromSocketlike, IntoFilelike, IntoSocketlike};
 #[cfg(unix)]
 use std::os::unix::{
     io::{AsRawFd, RawFd},
@@ -16,20 +17,22 @@ use std::{
     net::TcpStream,
 };
 use system_interface::io::{Peek, ReadReady};
-#[cfg(not(windows))]
-use unsafe_io::os::posish::AsRawReadWriteFd;
 #[cfg(windows)]
 use unsafe_io::os::windows::{
-    AsRawHandleOrSocket, AsRawReadWriteHandleOrSocket, RawHandleOrSocket,
+    AsHandleOrSocket, AsRawHandleOrSocket, AsRawReadWriteHandleOrSocket, AsReadWriteHandleOrSocket,
+    BorrowedHandleOrSocket, RawHandleOrSocket,
 };
-use unsafe_io::{
-    AsUnsafeHandle, AsUnsafeReadWriteHandle, FromUnsafeFile, FromUnsafeSocket, IntoUnsafeFile,
-    IntoUnsafeSocket, UnsafeHandle, UnsafeReadable, UnsafeWriteable,
-};
+use unsafe_io::{AsRawGrip, AsRawReadWriteGrip, FromRawGrip, RawGrip};
+use unsafe_io::{UnsafeReadable, UnsafeWriteable};
 #[cfg(all(not(target_os = "wasi"), feature = "socketpair"))]
 use {
     duplex::HalfDuplex,
     socketpair::{socketpair_stream, SocketpairStream},
+};
+#[cfg(not(windows))]
+use {
+    io_lifetimes::{AsFd, BorrowedFd},
+    unsafe_io::os::posish::{AsRawReadWriteFd, AsReadWriteFd},
 };
 #[cfg(not(target_os = "wasi"))]
 use {
@@ -184,12 +187,12 @@ impl StreamReader {
 
         // Obtain stdin's handle.
         #[cfg(not(windows))]
-        let handle = stdin_locker.as_unsafe_handle();
+        let handle = stdin_locker.as_raw_fd();
 
         // On Windows, stdin may be connected to a UTF-16 console, which
         // `RawHandleOrSocket` can take care of for us.
         #[cfg(windows)]
-        let handle = UnsafeHandle::unowned_from_raw_handle_or_socket(RawHandleOrSocket::stdin());
+        let handle = RawHandleOrSocket::stdin();
 
         Ok(Self::handle(handle, ReadResources::Stdin(stdin_locker)))
     }
@@ -199,17 +202,17 @@ impl StreamReader {
     /// This method can be passed a [`std::fs::File`] or similar `File` types.
     #[inline]
     #[must_use]
-    pub fn file<Filelike: IntoUnsafeFile + Read + Write + Seek>(filelike: Filelike) -> Self {
+    pub fn file<Filelike: IntoFilelike + Read + Write + Seek>(filelike: Filelike) -> Self {
         // Safety: We don't implement `From`/`Into` to allow the inner `File`
         // to be extracted, so we don't need to worry that we're granting
         // ambient authorities here.
-        Self::_file(File::from_filelike(filelike))
+        Self::_file(File::from_into_filelike(filelike))
     }
 
     #[inline]
     #[must_use]
     fn _file(file: File) -> Self {
-        let handle = file.as_unsafe_handle();
+        let handle = file.as_raw_grip();
         Self::handle(handle, ReadResources::File(file))
     }
 
@@ -219,14 +222,14 @@ impl StreamReader {
     /// `TcpStream` types.
     #[inline]
     #[must_use]
-    pub fn tcp_stream<Socketlike: IntoUnsafeSocket>(socketlike: Socketlike) -> Self {
-        Self::_tcp_stream(TcpStream::from_socketlike(socketlike))
+    pub fn tcp_stream<Socketlike: IntoSocketlike>(socketlike: Socketlike) -> Self {
+        Self::_tcp_stream(TcpStream::from_into_socketlike(socketlike))
     }
 
     #[inline]
     #[must_use]
     fn _tcp_stream(tcp_stream: TcpStream) -> Self {
-        let handle = tcp_stream.as_unsafe_handle();
+        let handle = tcp_stream.as_raw_grip();
         // Safety: We don't implement `From`/`Into` to allow the inner
         // `TcpStream` to be extracted, so we don't need to worry that
         // we're granting ambient authorities here.
@@ -238,7 +241,7 @@ impl StreamReader {
     #[inline]
     #[must_use]
     pub fn unix_stream(unix_stream: UnixStream) -> Self {
-        let handle = unix_stream.as_unsafe_handle();
+        let handle = unix_stream.as_raw_grip();
         Self::handle(handle, ReadResources::UnixStream(unix_stream))
     }
 
@@ -247,7 +250,7 @@ impl StreamReader {
     #[inline]
     #[must_use]
     pub fn pipe_reader(pipe_reader: PipeReader) -> Self {
-        let handle = pipe_reader.as_unsafe_handle();
+        let handle = pipe_reader.as_raw_grip();
         Self::handle(handle, ReadResources::PipeReader(pipe_reader))
     }
 
@@ -257,7 +260,7 @@ impl StreamReader {
         command.stdin(Stdio::null());
         command.stdout(Stdio::piped());
         let child = command.spawn()?;
-        let handle = child.stdout.as_ref().unwrap().as_unsafe_handle();
+        let handle = child.stdout.as_ref().unwrap().as_raw_grip();
         Ok(Self::handle(handle, ReadResources::Child(child)))
     }
 
@@ -266,7 +269,7 @@ impl StreamReader {
     #[inline]
     #[must_use]
     pub fn child_stdout(child_stdout: ChildStdout) -> Self {
-        let handle = child_stdout.as_unsafe_handle();
+        let handle = child_stdout.as_raw_grip();
         Self::handle(handle, ReadResources::ChildStdout(child_stdout))
     }
 
@@ -275,7 +278,7 @@ impl StreamReader {
     #[inline]
     #[must_use]
     pub fn child_stderr(child_stderr: ChildStderr) -> Self {
-        let handle = child_stderr.as_unsafe_handle();
+        let handle = child_stderr.as_raw_grip();
         Self::handle(handle, ReadResources::ChildStderr(child_stderr))
     }
 
@@ -288,7 +291,7 @@ impl StreamReader {
         let join_handle = thread::Builder::new()
             .name("piped thread for boxed reader".to_owned())
             .spawn(move || copy(&mut *boxed_read, &mut pipe_writer).map(|_size| ()))?;
-        let handle = pipe_reader.as_unsafe_handle();
+        let handle = pipe_reader.as_raw_grip();
         Ok(Self::handle(
             handle,
             ReadResources::PipedThread(Some((pipe_reader, join_handle))),
@@ -327,7 +330,7 @@ impl StreamReader {
             pipe_writer.flush()?;
             drop(pipe_writer);
 
-            let handle = pipe_reader.as_unsafe_handle();
+            let handle = pipe_reader.as_raw_grip();
             return Ok(Self::handle(handle, ReadResources::PipeReader(pipe_reader)));
         }
 
@@ -337,9 +340,9 @@ impl StreamReader {
 
     #[inline]
     #[must_use]
-    fn handle(handle: UnsafeHandle, resources: ReadResources) -> Self {
+    fn handle(handle: RawGrip, resources: ReadResources) -> Self {
         Self {
-            handle: unsafe { handle.as_readable() },
+            handle: unsafe { UnsafeReadable::from_raw_grip(handle) },
             resources,
         }
     }
@@ -379,12 +382,12 @@ impl StreamWriter {
 
         // Obtain stdout's handle.
         #[cfg(not(windows))]
-        let handle = stdout_locker.as_unsafe_handle();
+        let handle = stdout_locker.as_raw_fd();
 
         // On Windows, stdout may be connected to a UTF-16 console, which
         // `RawHandleOrSocket` can take care of for us.
         #[cfg(windows)]
-        let handle = UnsafeHandle::unowned_from_raw_handle_or_socket(RawHandleOrSocket::stdout());
+        let handle = RawHandleOrSocket::stdout();
 
         Ok(Self::handle(handle, WriteResources::Stdout(stdout_locker)))
     }
@@ -394,17 +397,17 @@ impl StreamWriter {
     /// This method can be passed a [`std::fs::File`] or similar `File` types.
     #[inline]
     #[must_use]
-    pub fn file<Filelike: IntoUnsafeFile + Read + Write + Seek>(filelike: Filelike) -> Self {
+    pub fn file<Filelike: IntoFilelike + Read + Write + Seek>(filelike: Filelike) -> Self {
         // Safety: We don't implement `From`/`Into` to allow the inner `File`
         // to be extracted, so we don't need to worry that we're granting
         // ambient authorities here.
-        Self::_file(File::from_filelike(filelike))
+        Self::_file(File::from_into_filelike(filelike))
     }
 
     #[inline]
     #[must_use]
     fn _file(file: File) -> Self {
-        let handle = file.as_unsafe_handle();
+        let handle = file.as_raw_grip();
         Self::handle(handle, WriteResources::File(file))
     }
 
@@ -414,17 +417,17 @@ impl StreamWriter {
     /// `TcpStream` types.
     #[inline]
     #[must_use]
-    pub fn tcp_stream<Socketlike: IntoUnsafeSocket>(socketlike: Socketlike) -> Self {
+    pub fn tcp_stream<Socketlike: IntoSocketlike>(socketlike: Socketlike) -> Self {
         // Safety: We don't implement `From`/`Into` to allow the inner
         // `TcpStream` to be extracted, so we don't need to worry that we're
         // granting ambient authorities here.
-        Self::_tcp_stream(TcpStream::from_socketlike(socketlike))
+        Self::_tcp_stream(TcpStream::from_into_socketlike(socketlike))
     }
 
     #[inline]
     #[must_use]
     fn _tcp_stream(tcp_stream: TcpStream) -> Self {
-        let handle = tcp_stream.as_unsafe_handle();
+        let handle = tcp_stream.as_raw_grip();
         Self::handle(handle, WriteResources::TcpStream(tcp_stream))
     }
 
@@ -433,7 +436,7 @@ impl StreamWriter {
     #[inline]
     #[must_use]
     pub fn unix_stream(unix_stream: UnixStream) -> Self {
-        let handle = unix_stream.as_unsafe_handle();
+        let handle = unix_stream.as_raw_grip();
         Self::handle(handle, WriteResources::UnixStream(unix_stream))
     }
 
@@ -442,7 +445,7 @@ impl StreamWriter {
     #[inline]
     #[must_use]
     pub fn pipe_writer(pipe_writer: PipeWriter) -> Self {
-        let handle = pipe_writer.as_unsafe_handle();
+        let handle = pipe_writer.as_raw_grip();
         Self::handle(handle, WriteResources::PipeWriter(pipe_writer))
     }
 
@@ -453,7 +456,7 @@ impl StreamWriter {
         command.stdin(Stdio::piped());
         command.stdout(Stdio::null());
         let child = command.spawn()?;
-        let handle = child.stdin.as_ref().unwrap().as_unsafe_handle();
+        let handle = child.stdin.as_ref().unwrap().as_raw_grip();
         Ok(Self::handle(handle, WriteResources::Child(child)))
     }
 
@@ -462,7 +465,7 @@ impl StreamWriter {
     #[inline]
     #[must_use]
     pub fn child_stdin(child_stdin: ChildStdin) -> Self {
-        let handle = child_stdin.as_unsafe_handle();
+        let handle = child_stdin.as_raw_grip();
         Self::handle(handle, WriteResources::ChildStdin(child_stdin))
     }
 
@@ -487,7 +490,7 @@ impl StreamWriter {
                 boxed_write.flush()?;
                 Ok(boxed_write)
             })?;
-        let handle = pipe_writer.as_unsafe_handle();
+        let handle = pipe_writer.as_raw_grip();
         Ok(Self::handle(
             handle,
             WriteResources::PipedThread(Some((pipe_writer, join_handle))),
@@ -508,9 +511,9 @@ impl StreamWriter {
     }
 
     #[inline]
-    fn handle(handle: UnsafeHandle, resources: WriteResources) -> Self {
+    fn handle(handle: RawGrip, resources: WriteResources) -> Self {
         Self {
-            handle: unsafe { handle.as_writeable() },
+            handle: unsafe { UnsafeWriteable::from_raw_grip(handle) },
             resources,
         }
     }
@@ -546,18 +549,12 @@ impl StreamDuplexer {
 
         // Obtain stdin's and stdout's handles.
         #[cfg(not(windows))]
-        let (read, write) = (
-            stdin_locker.as_unsafe_handle(),
-            stdout_locker.as_unsafe_handle(),
-        );
+        let (read, write) = (stdin_locker.as_raw_grip(), stdout_locker.as_raw_grip());
 
         // On Windows, stdin and stdout may be connected to a UTF-16 console,
         // which `RawHandleOrSocket` can take care of for us.
         #[cfg(windows)]
-        let (read, write) = (
-            UnsafeHandle::unowned_from_raw_handle_or_socket(RawHandleOrSocket::stdin()),
-            UnsafeHandle::unowned_from_raw_handle_or_socket(RawHandleOrSocket::stdout()),
-        );
+        let (read, write) = (RawHandleOrSocket::stdin(), RawHandleOrSocket::stdout());
 
         Ok(Self::two_handles(
             read,
@@ -571,7 +568,7 @@ impl StreamDuplexer {
     #[inline]
     #[must_use]
     pub fn char_device(char_device: CharDevice) -> Self {
-        let handle = char_device.as_unsafe_handle();
+        let handle = char_device.as_raw_grip();
         Self::handle(handle, DuplexResources::CharDevice(char_device))
     }
 
@@ -581,14 +578,14 @@ impl StreamDuplexer {
     /// `TcpStream` types.
     #[inline]
     #[must_use]
-    pub fn tcp_stream<Socketlike: IntoUnsafeSocket>(socketlike: Socketlike) -> Self {
-        Self::_tcp_stream(TcpStream::from_socketlike(socketlike))
+    pub fn tcp_stream<Socketlike: IntoSocketlike>(socketlike: Socketlike) -> Self {
+        Self::_tcp_stream(TcpStream::from_into_socketlike(socketlike))
     }
 
     #[inline]
     #[must_use]
     fn _tcp_stream(tcp_stream: TcpStream) -> Self {
-        let handle = tcp_stream.as_unsafe_handle();
+        let handle = tcp_stream.as_raw_grip();
         // Safety: We don't implement `From`/`Into` to allow the inner
         // `TcpStream` to be extracted, so we don't need to worry that
         // we're granting ambient authorities here.
@@ -599,7 +596,7 @@ impl StreamDuplexer {
     #[cfg(unix)]
     #[must_use]
     pub fn unix_stream(unix_stream: UnixStream) -> Self {
-        let handle = unix_stream.as_unsafe_handle();
+        let handle = unix_stream.as_raw_grip();
         Self::handle(handle, DuplexResources::UnixStream(unix_stream))
     }
 
@@ -608,8 +605,8 @@ impl StreamDuplexer {
     #[inline]
     #[must_use]
     pub fn pipe_reader_writer(pipe_reader: PipeReader, pipe_writer: PipeWriter) -> Self {
-        let read = pipe_reader.as_unsafe_handle();
-        let write = pipe_writer.as_unsafe_handle();
+        let read = pipe_reader.as_raw_grip();
+        let write = pipe_writer.as_raw_grip();
         Self::two_handles(
             read,
             write,
@@ -621,7 +618,7 @@ impl StreamDuplexer {
     #[cfg(all(not(target_os = "wasi"), feature = "socketpair"))]
     #[must_use]
     pub fn socketpair_stream(stream: SocketpairStream) -> Self {
-        let handle = stream.as_unsafe_handle();
+        let handle = stream.as_raw_grip();
         Self::handle(handle, DuplexResources::SocketpairStream(stream))
     }
 
@@ -631,8 +628,8 @@ impl StreamDuplexer {
         command.stdin(Stdio::piped());
         command.stdout(Stdio::piped());
         let child = command.spawn()?;
-        let read = child.stdout.as_ref().unwrap().as_unsafe_handle();
-        let write = child.stdin.as_ref().unwrap().as_unsafe_handle();
+        let read = child.stdout.as_ref().unwrap().as_raw_grip();
+        let write = child.stdin.as_ref().unwrap().as_raw_grip();
         Ok(Self::two_handles(
             read,
             write,
@@ -646,8 +643,8 @@ impl StreamDuplexer {
     #[inline]
     #[must_use]
     pub fn child_stdout_stdin(child_stdout: ChildStdout, child_stdin: ChildStdin) -> Self {
-        let read = child_stdout.as_unsafe_handle();
-        let write = child_stdin.as_unsafe_handle();
+        let read = child_stdout.as_raw_grip();
+        let write = child_stdin.as_raw_grip();
         Self::two_handles(
             read,
             write,
@@ -676,7 +673,7 @@ impl StreamDuplexer {
                 read_first(a, &mut *boxed_duplex)?;
                 Ok(boxed_duplex)
             })?;
-        let handle = b.as_unsafe_handle();
+        let handle = b.as_raw_grip();
         Ok(Self::handle(
             handle,
             DuplexResources::SocketedThread(Some((b, join_handle))),
@@ -704,7 +701,7 @@ impl StreamDuplexer {
                 write_first(a, &mut *boxed_duplex)?;
                 Ok(boxed_duplex)
             })?;
-        let handle = b.as_unsafe_handle();
+        let handle = b.as_raw_grip();
         Ok(Self::handle(
             handle,
             DuplexResources::SocketedThread(Some((b, join_handle))),
@@ -749,7 +746,7 @@ impl StreamDuplexer {
                 }
                 Ok(boxed_duplex)
             })?;
-        let handle = b.as_unsafe_handle();
+        let handle = b.as_raw_grip();
         Ok(Self::handle(
             handle,
             DuplexResources::SocketedThreadReadReady(Some((b, join_handle))),
@@ -774,7 +771,7 @@ impl StreamDuplexer {
         let join_handle = thread::Builder::new()
             .name("socketed thread for boxed duplexer".to_owned())
             .spawn(move || func(a))?;
-        let handle = b.as_unsafe_handle();
+        let handle = b.as_raw_grip();
         Ok(Self::handle(
             handle,
             DuplexResources::SocketedThreadFunc(Some((b, join_handle))),
@@ -793,26 +790,26 @@ impl StreamDuplexer {
         #[cfg(windows)]
         let file = OpenOptions::new().read(true).write(true).open("nul")?;
 
-        let handle = file.as_unsafe_handle();
+        let handle = file.as_raw_grip();
         Ok(Self::handle(handle, DuplexResources::DevNull(file)))
     }
 
     #[inline]
     #[must_use]
-    fn handle(handle: UnsafeHandle, resources: DuplexResources) -> Self {
+    fn handle(handle: RawGrip, resources: DuplexResources) -> Self {
         Self {
-            read_handle: unsafe { handle.as_readable() },
-            write_handle: unsafe { handle.as_writeable() },
+            read_handle: unsafe { UnsafeReadable::from_raw_grip(handle) },
+            write_handle: unsafe { UnsafeWriteable::from_raw_grip(handle) },
             resources,
         }
     }
 
     #[inline]
     #[must_use]
-    fn two_handles(read: UnsafeHandle, write: UnsafeHandle, resources: DuplexResources) -> Self {
+    fn two_handles(read: RawGrip, write: RawGrip, resources: DuplexResources) -> Self {
         Self {
-            read_handle: unsafe { read.as_readable() },
-            write_handle: unsafe { write.as_writeable() },
+            read_handle: unsafe { UnsafeReadable::from_raw_grip(read) },
+            write_handle: unsafe { UnsafeWriteable::from_raw_grip(write) },
             resources,
         }
     }
@@ -1208,6 +1205,80 @@ impl AsRawReadWriteHandleOrSocket for StreamDuplexer {
     }
 }
 
+#[cfg(not(windows))]
+impl AsFd for StreamReader {
+    #[inline]
+    fn as_fd(&self) -> BorrowedFd<'_> {
+        unsafe { BorrowedFd::borrow_raw_fd(self.handle.as_raw_fd()) }
+    }
+}
+
+#[cfg(not(windows))]
+impl AsFd for StreamWriter {
+    #[inline]
+    fn as_fd(&self) -> BorrowedFd<'_> {
+        unsafe { BorrowedFd::borrow_raw_fd(self.handle.as_raw_fd()) }
+    }
+}
+
+#[cfg(not(windows))]
+impl AsReadWriteFd for StreamDuplexer {
+    #[inline]
+    fn as_read_fd(&self) -> BorrowedFd<'_> {
+        unsafe { BorrowedFd::borrow_raw_fd(self.read_handle.as_raw_fd()) }
+    }
+
+    #[inline]
+    fn as_write_fd(&self) -> BorrowedFd<'_> {
+        unsafe { BorrowedFd::borrow_raw_fd(self.write_handle.as_raw_fd()) }
+    }
+}
+
+#[cfg(windows)]
+impl AsHandleOrSocket for StreamReader {
+    #[inline]
+    fn as_handle_or_socket(&self) -> BorrowedHandleOrSocket<'_> {
+        unsafe {
+            BorrowedHandleOrSocket::borrow_raw_handle_or_socket(
+                self.handle.as_raw_handle_or_socket(),
+            )
+        }
+    }
+}
+
+#[cfg(windows)]
+impl AsHandleOrSocket for StreamWriter {
+    #[inline]
+    fn as_handle_or_socket(&self) -> BorrowedHandleOrSocket<'_> {
+        unsafe {
+            BorrowedHandleOrSocket::borrow_raw_handle_or_socket(
+                self.handle.as_raw_handle_or_socket(),
+            )
+        }
+    }
+}
+
+#[cfg(windows)]
+impl AsReadWriteHandleOrSocket for StreamDuplexer {
+    #[inline]
+    fn as_read_handle_or_socket(&self) -> BorrowedHandleOrSocket<'_> {
+        unsafe {
+            BorrowedHandleOrSocket::borrow_raw_handle_or_socket(
+                self.read_handle.as_raw_handle_or_socket(),
+            )
+        }
+    }
+
+    #[inline]
+    fn as_write_handle_or_socket(&self) -> BorrowedHandleOrSocket<'_> {
+        unsafe {
+            BorrowedHandleOrSocket::borrow_raw_handle_or_socket(
+                self.write_handle.as_raw_handle_or_socket(),
+            )
+        }
+    }
+}
+
 impl Drop for ReadResources {
     fn drop(&mut self) {
         match self {
@@ -1265,7 +1336,7 @@ impl Debug for StreamReader {
         // information about it, because this information is otherwise
         // unavailable to safe Rust code.
         f.debug_struct("StreamReader")
-            .field("unsafe_handle", &self.as_unsafe_handle())
+            .field("raw_grip", &self.as_raw_grip())
             .finish()
     }
 }
@@ -1276,7 +1347,7 @@ impl Debug for StreamWriter {
         // information about it, because this information is otherwise
         // unavailable to safe Rust code.
         f.debug_struct("StreamWriter")
-            .field("unsafe_handle", &self.as_unsafe_handle())
+            .field("raw_grip", &self.as_raw_grip())
             .finish()
     }
 }
@@ -1287,8 +1358,8 @@ impl Debug for StreamDuplexer {
         // information about it, because this information is otherwise
         // unavailable to safe Rust code.
         f.debug_struct("StreamDuplexer")
-            .field("unsafe_readable", &self.as_unsafe_read_handle())
-            .field("unsafe_writeable", &self.as_unsafe_write_handle())
+            .field("unsafe_readable", &self.as_raw_read_grip())
+            .field("unsafe_writeable", &self.as_raw_write_grip())
             .finish()
     }
 }
