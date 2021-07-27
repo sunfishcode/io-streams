@@ -3,20 +3,16 @@ use crate::lockers::{StdinLocker, StdoutLocker};
 use char_device::TokioCharDevice;
 use duplex::Duplex;
 use io_lifetimes::{FromFilelike, IntoFilelike};
+use std::fmt::{self, Debug};
+use std::io::IoSlice;
 #[cfg(target_os = "wasi")]
 use std::os::wasi::io::{AsRawFd, RawFd};
-use std::{
-    fmt::{self, Debug},
-    io::IoSlice,
-    pin::Pin,
-    task::{Context, Poll},
-};
+use std::pin::Pin;
+use std::task::{Context, Poll};
 use system_interface::io::ReadReady;
-use tokio::{
-    fs::File,
-    io::{self, AsyncRead, AsyncSeek, AsyncWrite, ReadBuf},
-    net::TcpStream,
-};
+use tokio::fs::File;
+use tokio::io::{self, AsyncRead, AsyncSeek, AsyncWrite, ReadBuf};
+use tokio::net::TcpStream;
 #[cfg(windows)]
 use unsafe_io::os::windows::{
     AsHandleOrSocket, AsRawHandleOrSocket, AsRawReadWriteHandleOrSocket, AsReadWriteHandleOrSocket,

@@ -1,16 +1,15 @@
 //! This file is derived from Rust's library/std/src/io/buffered at revision
 //! f7801d6c7cc19ab22bdebcc8efa894a564c53469.
 
-use super::{buf_duplexer::BufDuplexerBackend, BufReaderLineWriterShim, IntoInnerError};
+use super::buf_duplexer::BufDuplexerBackend;
+use super::{BufReaderLineWriterShim, IntoInnerError};
 use duplex::HalfDuplex;
 #[cfg(feature = "layered-io")]
 use layered_io::{Bufferable, HalfDuplexLayered};
+use std::fmt;
 #[cfg(read_initializer)]
 use std::io::Initializer;
-use std::{
-    fmt,
-    io::{self, BufRead, IoSlice, IoSliceMut, Read, Write},
-};
+use std::io::{self, BufRead, IoSlice, IoSliceMut, Read, Write};
 #[cfg(not(windows))]
 use {
     io_lifetimes::{AsFd, BorrowedFd},
@@ -50,7 +49,8 @@ use {
 /// ```no_run
 /// use char_device::CharDevice;
 /// use io_streams::BufReaderLineWriter;
-/// use std::{fs, io::prelude::*};
+/// use std::fs;
+/// use std::io::prelude::*;
 ///
 /// fn main() -> std::io::Result<()> {
 ///     let road_not_taken = b"I shall be telling this with a sigh

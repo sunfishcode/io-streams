@@ -5,15 +5,14 @@ use io_lifetimes::AsFilelike;
 use io_lifetimes::{AsFd, BorrowedFd};
 use os_pipe::PipeReader;
 use parking::{Parker, Unparker};
+use std::io::{self, stdin, stdout};
 #[cfg(unix)]
 use std::os::unix::io::{AsRawFd, RawFd};
 #[cfg(target_os = "wasi")]
 use std::os::wasi::io::{AsRawFd, RawFd};
-use std::{
-    io::{self, stdin, stdout},
-    sync::atomic::{AtomicBool, Ordering::SeqCst},
-    thread::{self, JoinHandle},
-};
+use std::sync::atomic::AtomicBool;
+use std::sync::atomic::Ordering::SeqCst;
+use std::thread::{self, JoinHandle};
 use system_interface::io::ReadReady;
 #[cfg(windows)]
 use {

@@ -12,7 +12,8 @@ mod buf_duplexer;
 mod buf_reader_line_writer;
 mod buf_reader_line_writer_shim;
 
-use std::{error, fmt, io::Error};
+use std::io::Error;
+use std::{error, fmt};
 
 pub use buf_duplexer::BufDuplexer;
 pub use buf_reader_line_writer::BufReaderLineWriter;
@@ -28,7 +29,8 @@ pub(super) const DEFAULT_BUF_SIZE: usize = 8 * 1024;
 /// # Examples
 ///
 /// ```no_run
-/// use std::{io::BufWriter, net::TcpStream};
+/// use std::io::BufWriter;
+/// use std::net::TcpStream;
 ///
 /// let mut stream = BufWriter::new(TcpStream::connect("127.0.0.1:34254").unwrap());
 ///
@@ -70,7 +72,8 @@ impl<W> IntoInnerError<W> {
     /// # Examples
     ///
     /// ```no_run
-    /// use std::{io::BufWriter, net::TcpStream};
+    /// use std::io::BufWriter;
+    /// use std::net::TcpStream;
     ///
     /// let mut stream = BufWriter::new(TcpStream::connect("127.0.0.1:34254").unwrap());
     ///
@@ -104,7 +107,8 @@ impl<W> IntoInnerError<W> {
     /// # Examples
     ///
     /// ```no_run
-    /// use std::{io::BufWriter, net::TcpStream};
+    /// use std::io::BufWriter;
+    /// use std::net::TcpStream;
     ///
     /// let mut stream = BufWriter::new(TcpStream::connect("127.0.0.1:34254").unwrap());
     ///

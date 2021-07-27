@@ -7,10 +7,8 @@ use duplex::HalfDuplex;
 use layered_io::{default_suggested_buffer_size, Bufferable, HalfDuplexLayered};
 #[cfg(read_initializer)]
 use std::io::Initializer;
-use std::{
-    cmp, fmt,
-    io::{self, BufRead, Error, ErrorKind, IoSlice, IoSliceMut, Read, Write},
-};
+use std::io::{self, BufRead, Error, ErrorKind, IoSlice, IoSliceMut, Read, Write};
+use std::{cmp, fmt};
 #[cfg(not(windows))]
 use {
     io_lifetimes::{AsFd, BorrowedFd},
@@ -68,7 +66,8 @@ use {
 /// Let's write the numbers one through ten to a [`TcpStream`]:
 ///
 /// ```no_run
-/// use std::{io::prelude::*, net::TcpStream};
+/// use std::io::prelude::*;
+/// use std::net::TcpStream;
 ///
 /// let mut stream = TcpStream::connect("127.0.0.1:34254").unwrap();
 ///
@@ -83,7 +82,8 @@ use {
 ///
 /// ```no_run
 /// use io_streams::BufDuplexer;
-/// use std::{io::prelude::*, net::TcpStream};
+/// use std::io::prelude::*;
+/// use std::net::TcpStream;
 ///
 /// let mut stream = BufDuplexer::new(TcpStream::connect("127.0.0.1:34254").unwrap());
 ///
@@ -99,7 +99,8 @@ use {
 ///
 /// ```no_run
 /// use io_streams::BufDuplexer;
-/// use std::{io::prelude::*, net::TcpStream};
+/// use std::io::prelude::*;
+/// use std::net::TcpStream;
 ///
 /// fn main() -> std::io::Result<()> {
 ///     let mut stream = BufDuplexer::new(TcpStream::connect("127.0.0.1:34254").unwrap());
@@ -244,7 +245,8 @@ impl<Inner: HalfDuplex> BufDuplexer<Inner> {
     /// ```no_run
     /// use char_device::CharDevice;
     /// use io_streams::BufDuplexer;
-    /// use std::{fs::File, io::BufRead};
+    /// use std::fs::File;
+    /// use std::io::BufRead;
     ///
     /// fn main() -> std::io::Result<()> {
     ///     let f = CharDevice::new(File::open("/dev/ttyS0")?)?;
@@ -290,7 +292,8 @@ impl<Inner: HalfDuplex> BufDuplexer<Inner> {
     /// ```no_run
     /// use char_device::CharDevice;
     /// use io_streams::BufDuplexer;
-    /// use std::{fs::File, io::BufRead};
+    /// use std::fs::File;
+    /// use std::io::BufRead;
     ///
     /// fn main() -> std::io::Result<()> {
     ///     let f = CharDevice::new(File::open("/dev/tty")?)?;

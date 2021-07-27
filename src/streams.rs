@@ -3,6 +3,10 @@ use crate::lockers::{StdinLocker, StdoutLocker};
 use char_device::CharDevice;
 use duplex::Duplex;
 use io_lifetimes::{FromFilelike, FromSocketlike, IntoFilelike, IntoSocketlike};
+use std::fmt::{self, Arguments, Debug};
+use std::fs::{File, OpenOptions};
+use std::io::{self, IoSlice, IoSliceMut, Read, Seek, Write};
+use std::net::TcpStream;
 #[cfg(unix)]
 use std::os::unix::{
     io::{AsRawFd, RawFd},
@@ -10,20 +14,15 @@ use std::os::unix::{
 };
 #[cfg(target_os = "wasi")]
 use std::os::wasi::io::{AsRawFd, RawFd};
-use std::{
-    fmt::{self, Arguments, Debug},
-    fs::{File, OpenOptions},
-    io::{self, IoSlice, IoSliceMut, Read, Seek, Write},
-    net::TcpStream,
-};
 use system_interface::io::{Peek, ReadReady};
 #[cfg(windows)]
 use unsafe_io::os::windows::{
     AsHandleOrSocket, AsRawHandleOrSocket, AsRawReadWriteHandleOrSocket, AsReadWriteHandleOrSocket,
     BorrowedHandleOrSocket, RawHandleOrSocket,
 };
-use unsafe_io::{AsRawGrip, AsRawReadWriteGrip, FromRawGrip, RawGrip};
-use unsafe_io::{UnsafeReadable, UnsafeWriteable};
+use unsafe_io::{
+    AsRawGrip, AsRawReadWriteGrip, FromRawGrip, RawGrip, UnsafeReadable, UnsafeWriteable,
+};
 #[cfg(all(not(target_os = "wasi"), feature = "socketpair"))]
 use {
     duplex::HalfDuplex,

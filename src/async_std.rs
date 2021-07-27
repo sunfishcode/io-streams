@@ -1,4 +1,7 @@
 use crate::lockers::{StdinLocker, StdoutLocker};
+use async_std::fs::File;
+use async_std::io::{self, IoSlice, IoSliceMut, Read, Seek, Write};
+use async_std::net::TcpStream;
 #[cfg(unix)]
 use async_std::os::unix::{
     io::{AsRawFd, RawFd},
@@ -6,20 +9,13 @@ use async_std::os::unix::{
 };
 #[cfg(target_os = "wasi")]
 use async_std::os::wasi::io::{AsRawFd, RawFd};
-use async_std::{
-    fs::File,
-    io::{self, IoSlice, IoSliceMut, Read, Seek, Write},
-    net::TcpStream,
-};
 #[cfg(feature = "char-device")]
 use char_device::AsyncStdCharDevice;
 use duplex::Duplex;
 use io_lifetimes::{FromFilelike, FromSocketlike, IntoFilelike, IntoSocketlike};
-use std::{
-    fmt::{self, Debug},
-    pin::Pin,
-    task::{Context, Poll},
-};
+use std::fmt::{self, Debug};
+use std::pin::Pin;
+use std::task::{Context, Poll};
 use system_interface::io::ReadReady;
 #[cfg(windows)]
 use unsafe_io::os::windows::{

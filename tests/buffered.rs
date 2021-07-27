@@ -10,14 +10,12 @@ extern crate test;
 
 use duplex::Duplex;
 use io_streams::{BufDuplexer, BufReaderLineWriter};
-use std::{
-    fmt::Arguments,
-    io::{self, prelude::*, ErrorKind, IoSlice, IoSliceMut},
-    ops::{Deref, DerefMut},
-    panic,
-    sync::atomic::{AtomicUsize, Ordering},
-    thread,
-};
+use std::fmt::Arguments;
+use std::io::prelude::*;
+use std::io::{self, ErrorKind, IoSlice, IoSliceMut};
+use std::ops::{Deref, DerefMut};
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::{panic, thread};
 
 /// The tests in this file were written for read-only and write-only streams;
 /// `JustReader` and `JustWriter` minimally adapt read-only and write-only
