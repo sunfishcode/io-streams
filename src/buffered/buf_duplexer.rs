@@ -33,34 +33,35 @@ use {
 /// `BufDuplexer<Inner>` keeps an in-memory buffer of data and writes it to an
 /// underlying writer in large, infrequent batches.
 ///
-/// It can be excessively inefficient to work directly with a [`Read`] instance.
-/// For example, every call to [`read`][`TcpStream::read`] on [`TcpStream`]
-/// results in a system call. A `BufDuplexer<Inner>` performs large, infrequent
-/// reads on the underlying [`Read`] and maintains an in-memory buffer of the results.
+/// It can be excessively inefficient to work directly with a [`Read`]
+/// instance. For example, every call to [`read`][`TcpStream::read`] on
+/// [`TcpStream`] results in a system call. A `BufDuplexer<Inner>` performs
+/// large, infrequent reads on the underlying [`Read`] and maintains an
+/// in-memory buffer of the results.
 ///
-/// `BufDuplexer<Inner>` can improve the speed of programs that make *small* and
-/// *repeated* write calls to the same file or network socket. It does not
+/// `BufDuplexer<Inner>` can improve the speed of programs that make *small*
+/// and *repeated* write calls to the same file or network socket. It does not
 /// help when writing very large amounts at once, or writing just one or a few
 /// times. It also provides no advantage when writing to a destination that is
 /// in memory, like a [`Vec`]`<u8>`.
 ///
-/// `BufDuplexer<Inner>` can improve the speed of programs that make *small* and
-/// *repeated* read calls to the same file or network socket. It does not
+/// `BufDuplexer<Inner>` can improve the speed of programs that make *small*
+/// and *repeated* read calls to the same file or network socket. It does not
 /// help when reading very large amounts at once, or reading just one or a few
 /// times. It also provides no advantage when reading from a source that is
 /// already in memory, like a [`Vec`]`<u8>`.
 ///
-/// It is critical to call [`flush`] before `BufDuplexer<Inner>` is dropped. Though
-/// dropping will attempt to flush the contents of the writer buffer, any errors
-/// that happen in the process of dropping will be ignored. Calling [`flush`]
-/// ensures that the writer buffer is empty and thus dropping will not even attempt
-/// file operations.
+/// It is critical to call [`flush`] before `BufDuplexer<Inner>` is dropped.
+/// Though dropping will attempt to flush the contents of the writer buffer,
+/// any errors that happen in the process of dropping will be ignored. Calling
+/// [`flush`] ensures that the writer buffer is empty and thus dropping will
+/// not even attempt file operations.
 ///
-/// When the `BufDuplexer<Inner>` is dropped, the contents of its reader buffer will be
-/// discarded. Creating multiple instances of a `BufDuplexer<Inner>` on the same
-/// stream can cause data loss. Reading from the underlying reader after
-/// unwrapping the `BufDuplexer<Inner>` with [`BufDuplexer::into_inner`] can also cause
-/// data loss.
+/// When the `BufDuplexer<Inner>` is dropped, the contents of its reader buffer
+/// will be discarded. Creating multiple instances of a `BufDuplexer<Inner>` on
+/// the same stream can cause data loss. Reading from the underlying reader
+/// after unwrapping the `BufDuplexer<Inner>` with [`BufDuplexer::into_inner`]
+/// can also cause data loss.
 ///
 /// # Examples
 ///
@@ -92,9 +93,9 @@ use {
 /// stream.flush().unwrap();
 /// ```
 ///
-/// By wrapping the stream with a `BufDuplexer<Inner>`, these ten writes are all grouped
-/// together by the buffer and will all be written out in one system call when
-/// the `stream` is flushed.
+/// By wrapping the stream with a `BufDuplexer<Inner>`, these ten writes are
+/// all grouped together by the buffer and will all be written out in one
+/// system call when the `stream` is flushed.
 ///
 /// ```no_run
 /// use io_streams::BufDuplexer;
@@ -135,8 +136,8 @@ pub(crate) struct BufDuplexerBackend<Inner: HalfDuplex> {
 }
 
 impl<Inner: HalfDuplex> BufDuplexer<Inner> {
-    /// Creates a new `BufDuplexer<Inner>` with default buffer capacities. The default is currently 8 KB,
-    /// but may change in the future.
+    /// Creates a new `BufDuplexer<Inner>` with default buffer capacities. The
+    /// default is currently 8 KB, but may change in the future.
     ///
     /// # Examples
     ///
@@ -153,11 +154,13 @@ impl<Inner: HalfDuplex> BufDuplexer<Inner> {
         }
     }
 
-    /// Creates a new `BufDuplexer<Inner>` with the specified buffer capacities.
+    /// Creates a new `BufDuplexer<Inner>` with the specified buffer
+    /// capacities.
     ///
     /// # Examples
     ///
-    /// Creating a buffer with ten bytes of reader capacity and a writer buffer of a hundered bytes:
+    /// Creating a buffer with ten bytes of reader capacity and a writer buffer
+    /// of a hundered bytes:
     ///
     /// ```no_run
     /// use io_streams::BufDuplexer;
@@ -231,7 +234,8 @@ impl<Inner: HalfDuplex> BufDuplexer<Inner> {
 
     /// Returns a reference to the internally buffered reader data.
     ///
-    /// Unlike [`fill_buf`], this will not attempt to fill the buffer if it is empty.
+    /// Unlike [`fill_buf`], this will not attempt to fill the buffer if it is
+    /// empty.
     ///
     /// [`fill_buf`]: BufRead::fill_buf
     ///
@@ -257,7 +261,8 @@ impl<Inner: HalfDuplex> BufDuplexer<Inner> {
         self.inner.reader_buffer()
     }
 
-    /// Returns the number of bytes the internal writer buffer can hold without flushing.
+    /// Returns the number of bytes the internal writer buffer can hold without
+    /// flushing.
     ///
     /// # Examples
     ///
@@ -277,7 +282,8 @@ impl<Inner: HalfDuplex> BufDuplexer<Inner> {
         self.inner.writer_capacity()
     }
 
-    /// Returns the number of bytes the internal reader buffer can hold at once.
+    /// Returns the number of bytes the internal reader buffer can hold at
+    /// once.
     ///
     /// # Examples
     ///
@@ -300,13 +306,15 @@ impl<Inner: HalfDuplex> BufDuplexer<Inner> {
         self.inner.reader_capacity()
     }
 
-    /// Unwraps this `BufDuplexer<Inner>`, returning the underlying reader/writer.
+    /// Unwraps this `BufDuplexer<Inner>`, returning the underlying
+    /// reader/writer.
     ///
     /// The buffer is written out before returning the reader/writer.
     ///
     /// # Errors
     ///
-    /// An [`Err`] will be returned if an error occurs while flushing the buffer.
+    /// An [`Err`] will be returned if an error occurs while flushing the
+    /// buffer.
     ///
     /// # Examples
     ///

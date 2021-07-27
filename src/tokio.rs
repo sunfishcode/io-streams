@@ -182,8 +182,9 @@ impl TokioStreamReader {
     /// unbuffered and unlocked.
     ///
     /// This acquires a [`tokio::io::StdinLock`] (in a non-recursive way) to
-    /// prevent accesses to `tokio::io::Stdin` while this is live, and fails if a
-    /// `TokioStreamReader` or `TokioStreamDuplexer` for standard input already exists.
+    /// prevent accesses to `tokio::io::Stdin` while this is live, and fails if
+    /// a `TokioStreamReader` or `TokioStreamDuplexer` for standard input
+    /// already exists.
     #[inline]
     pub fn stdin() -> io::Result<Self> {
         todo!("tokio stdin")
@@ -191,7 +192,8 @@ impl TokioStreamReader {
 
     /// Read from an open file, taking ownership of it.
     ///
-    /// This method can be passed a [`tokio::fs::File`] or similar `File` types.
+    /// This method can be passed a [`tokio::fs::File`] or similar `File`
+    /// types.
     #[inline]
     #[must_use]
     pub fn file<Filelike: IntoFilelike + AsyncRead + AsyncWrite + AsyncSeek>(
@@ -301,9 +303,9 @@ impl TokioStreamWriter {
     /// unbuffered and unlocked.
     ///
     /// This acquires a [`tokio::io::StdoutLock`] (in a non-recursive way) to
-    /// prevent accesses to `tokio::io::Stdout` while this is live, and fails if
-    /// a `TokioStreamWriter` or `TokioStreamDuplexer` for standard output already
-    /// exists.
+    /// prevent accesses to `tokio::io::Stdout` while this is live, and fails
+    /// if a `TokioStreamWriter` or `TokioStreamDuplexer` for standard
+    /// output already exists.
     #[inline]
     pub fn stdout() -> io::Result<Self> {
         todo!("tokio stdout")
@@ -311,7 +313,8 @@ impl TokioStreamWriter {
 
     /// Write to an open file, taking ownership of it.
     ///
-    /// This method can be passed a [`tokio::fs::File`] or similar `File` types.
+    /// This method can be passed a [`tokio::fs::File`] or similar `File`
+    /// types.
     #[inline]
     #[must_use]
     pub fn file<Filelike: IntoFilelike + AsyncRead + AsyncWrite + AsyncSeek>(
@@ -417,14 +420,16 @@ impl TokioStreamWriter {
 impl TokioStreamDuplexer {
     /// Duplex with stdin and stdout, taking ownership of them.
     ///
-    /// Unlike [`tokio::io::stdin`] and [`tokio::io::stdout`], this `stdin_stdout`
-    /// returns a stream which is unbuffered and unlocked.
+    /// Unlike [`tokio::io::stdin`] and [`tokio::io::stdout`], this
+    /// `stdin_stdout` returns a stream which is unbuffered and unlocked.
     ///
-    /// This acquires a [`tokio::io::StdinLock`] and a [`tokio::io::StdoutLock`]
-    /// (in non-recursive ways) to prevent accesses to [`tokio::io::Stdin`] and
-    /// [`tokio::io::Stdout`] while this is live, and fails if a `TokioStreamReader`
-    /// for standard input, a `TokioStreamWriter` for standard output, or a
-    /// `TokioStreamDuplexer` for standard input and standard output already exist.
+    /// This acquires a [`tokio::io::StdinLock`] and a
+    /// [`tokio::io::StdoutLock`] (in non-recursive ways) to prevent
+    /// accesses to [`tokio::io::Stdin`] and [`tokio::io::Stdout`] while
+    /// this is live, and fails if a `TokioStreamReader` for standard
+    /// input, a `TokioStreamWriter` for standard output, or a
+    /// `TokioStreamDuplexer` for standard input and standard output already
+    /// exist.
     #[inline]
     pub fn stdin_stdout() -> io::Result<Self> {
         todo!("tokio stdin_stdout")

@@ -26,8 +26,8 @@ impl<'a, Inner: HalfDuplex> BufReaderLineWriterShim<'a, Inner> {
     }
 
     /// Get a mutable reference to the inner writer (that is, the writer
-    /// wrapped by the `BufDuplexer`). Be careful with this writer, as writes to
-    /// it will bypass the buffer.
+    /// wrapped by the `BufDuplexer`). Be careful with this writer, as writes
+    /// to it will bypass the buffer.
     #[inline]
     fn inner_mut(&mut self) -> &mut Inner {
         self.buffer.get_mut()
@@ -51,19 +51,21 @@ impl<'a, Inner: HalfDuplex> BufReaderLineWriterShim<'a, Inner> {
 }
 
 impl<'a, Inner: HalfDuplex> Write for BufReaderLineWriterShim<'a, Inner> {
-    /// Write some data into this `BufReaderLineWriterShim` with line buffering. This means
-    /// that, if any newlines are present in the data, the data up to the last
-    /// newline is sent directly to the underlying writer, and data after it
-    /// is buffered. Returns the number of bytes written.
+    /// Write some data into this `BufReaderLineWriterShim` with line
+    /// buffering. This means that, if any newlines are present in the
+    /// data, the data up to the last newline is sent directly to the
+    /// underlying writer, and data after it is buffered. Returns the
+    /// number of bytes written.
     ///
     /// This function operates on a "best effort basis"; in keeping with the
-    /// convention of `std::io::Write::write`, it makes at most one attempt to write
-    /// new data to the underlying writer. If that write only reports a partial
-    /// success, the remaining data will be buffered.
+    /// convention of `std::io::Write::write`, it makes at most one attempt to
+    /// write new data to the underlying writer. If that write only reports
+    /// a partial success, the remaining data will be buffered.
     ///
-    /// Because this function attempts to send completed lines to the underlying
-    /// writer, it will also flush the existing buffer if it ends with a
-    /// newline, even if the incoming data does not contain any newlines.
+    /// Because this function attempts to send completed lines to the
+    /// underlying writer, it will also flush the existing buffer if it
+    /// ends with a newline, even if the incoming data does not contain any
+    /// newlines.
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         let newline_idx = match memchr::memrchr(b'\n', buf) {
             // If there are no new newlines (that is, if this write is less than
@@ -113,8 +115,7 @@ impl<'a, Inner: HalfDuplex> Write for BufReaderLineWriterShim<'a, Inner> {
         // the presumption that most writes succeed in totality, and that most
         // writes are smaller than the buffer.
         // - Is this a partial line (ie, no newlines left in the unwritten tail)
-        // - If not, does the data out to the last unwritten newline fit in
-        //   the buffer?
+        // - If not, does the data out to the last unwritten newline fit in the buffer?
         // - If not, scan for the last newline that *does* fit in the buffer
         let tail = if flushed >= newline_idx {
             &buf[flushed..]
@@ -138,26 +139,26 @@ impl<'a, Inner: HalfDuplex> Write for BufReaderLineWriterShim<'a, Inner> {
         self.buffer.flush()
     }
 
-    /// Write some vectored data into this `BufReaderLineWriterShim` with line buffering. This
-    /// means that, if any newlines are present in the data, the data up to
-    /// and including the buffer containing the last newline is sent directly
-    /// to the inner writer, and the data after it is buffered. Returns the
-    /// number of bytes written.
+    /// Write some vectored data into this `BufReaderLineWriterShim` with line
+    /// buffering. This means that, if any newlines are present in the
+    /// data, the data up to and including the buffer containing the last
+    /// newline is sent directly to the inner writer, and the data after it
+    /// is buffered. Returns the number of bytes written.
     ///
     /// This function operates on a "best effort basis"; in keeping with the
-    /// convention of `std::io::Write::write`, it makes at most one attempt to write
-    /// new data to the underlying writer.
+    /// convention of `std::io::Write::write`, it makes at most one attempt to
+    /// write new data to the underlying writer.
     ///
-    /// Because this function attempts to send completed lines to the underlying
-    /// writer, it will also flush the existing buffer if it contains any
-    /// newlines.
+    /// Because this function attempts to send completed lines to the
+    /// underlying writer, it will also flush the existing buffer if it
+    /// contains any newlines.
     ///
     /// Because sorting through an array of `IoSlice` can be a bit convoluted,
     /// This method differs from write in the following ways:
     ///
     /// - It attempts to write the full content of all the buffers up to and
-    ///   including the one containing the last newline. This means that it
-    ///   may attempt to write a partial line, that buffer has data past the
+    ///   including the one containing the last newline. This means that it may
+    ///   attempt to write a partial line, that buffer has data past the
     ///   newline.
     /// - If the write only reports partial success, it does not attempt to
     ///   find the precise location of the written bytes and buffer the rest.
@@ -241,14 +242,15 @@ impl<'a, Inner: HalfDuplex> Write for BufReaderLineWriterShim<'a, Inner> {
         self.buffer.is_write_vectored()
     }
 
-    /// Write some data into this `BufReaderLineWriterShim` with line buffering. This means
-    /// that, if any newlines are present in the data, the data up to the last
-    /// newline is sent directly to the underlying writer, and data after it
-    /// is buffered.
+    /// Write some data into this `BufReaderLineWriterShim` with line
+    /// buffering. This means that, if any newlines are present in the
+    /// data, the data up to the last newline is sent directly to the
+    /// underlying writer, and data after it is buffered.
     ///
-    /// Because this function attempts to send completed lines to the underlying
-    /// writer, it will also flush the existing buffer if it contains any
-    /// newlines, even if the incoming data does not contain any newlines.
+    /// Because this function attempts to send completed lines to the
+    /// underlying writer, it will also flush the existing buffer if it
+    /// contains any newlines, even if the incoming data does not contain
+    /// any newlines.
     fn write_all(&mut self, buf: &[u8]) -> io::Result<()> {
         match memchr::memrchr(b'\n', buf) {
             // If there are no new newlines (that is, if this write is less than

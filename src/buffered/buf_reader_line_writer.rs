@@ -25,20 +25,22 @@ use {
     },
 };
 
-/// Wraps a reader and writer and buffers input and output to and from it, flushing
-/// the writer whenever a newline (`0x0a`, `'\n'`) is detected on output.
+/// Wraps a reader and writer and buffers input and output to and from it,
+/// flushing the writer whenever a newline (`0x0a`, `'\n'`) is detected on
+/// output.
 ///
-/// The [`BufDuplexer`] struct wraps a reader and writer and buffers their input and output.
-/// But it only does this batched write when it goes out of scope, or when the
-/// internal buffer is full. Sometimes, you'd prefer to write each line as it's
-/// completed, rather than the entire buffer at once. Enter `BufReaderLineWriter`. It
-/// does exactly that.
+/// The [`BufDuplexer`] struct wraps a reader and writer and buffers their
+/// input and output. But it only does this batched write when it goes out of
+/// scope, or when the internal buffer is full. Sometimes, you'd prefer to
+/// write each line as it's completed, rather than the entire buffer at once.
+/// Enter `BufReaderLineWriter`. It does exactly that.
 ///
-/// Like [`BufDuplexer`], a `BufReaderLineWriter`’s buffer will also be flushed when the
-/// `BufReaderLineWriter` goes out of scope or when its internal buffer is full.
+/// Like [`BufDuplexer`], a `BufReaderLineWriter`’s buffer will also be flushed
+/// when the `BufReaderLineWriter` goes out of scope or when its internal
+/// buffer is full.
 ///
-/// If there's still a partial line in the buffer when the `BufReaderLineWriter` is
-/// dropped, it will flush those contents.
+/// If there's still a partial line in the buffer when the
+/// `BufReaderLineWriter` is dropped, it will flush those contents.
 ///
 /// # Examples
 ///
@@ -125,8 +127,8 @@ impl<Inner: HalfDuplex> BufReaderLineWriter<Inner> {
         }
     }
 
-    /// Creates a new `BufReaderLineWriter` with a specified capacities for the internal
-    /// buffers.
+    /// Creates a new `BufReaderLineWriter` with a specified capacities for the
+    /// internal buffers.
     ///
     /// # Examples
     ///
@@ -203,7 +205,8 @@ impl<Inner: HalfDuplex> BufReaderLineWriter<Inner> {
     ///
     /// # Errors
     ///
-    /// An [`Err`] will be returned if an error occurs while flushing the buffer.
+    /// An [`Err`] will be returned if an error occurs while flushing the
+    /// buffer.
     ///
     /// # Examples
     ///

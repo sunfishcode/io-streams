@@ -597,8 +597,8 @@ impl Write for ProgrammableSink {
     }
 }
 
-/// Previously the `BufReaderLineWriter` could successfully write some bytes but
-/// then fail to report that it has done so. Additionally, an erroneous
+/// Previously the `BufReaderLineWriter` could successfully write some bytes
+/// but then fail to report that it has done so. Additionally, an erroneous
 /// flush after a successful write was permanently ignored.
 ///
 /// Test that a line writer correctly reports the number of written bytes,
@@ -784,8 +784,8 @@ fn line_vectored_partial_and_errors() {
 }
 
 /// Test that, in cases where vectored writing is not enabled, the
-/// BufReaderLineWriter uses the normal `write` call, which more-correctly handles
-/// partial lines
+/// BufReaderLineWriter uses the normal `write` call, which more-correctly
+/// handles partial lines
 #[test]
 #[cfg(can_vector)]
 fn line_vectored_ignored() {
@@ -1002,11 +1002,11 @@ fn partial_multiline_buffering() {
     let content = b"AAAAABBBBB\nCCCCDDDDDD\nEEE";
 
     // When content is written, BufReaderLineWriter will try to write blocks A, B,
-    // C, and D. Only block A will succeed. Under the old behavior, BufReaderLineWriter
-    // would then try to buffer B, C and D, but because its capacity is 10,
-    // it will only be able to buffer B and C. We don't want to buffer
-    // partial lines concurrent with whole lines, so the correct behavior
-    // is to buffer only block B (out to the newline)
+    // C, and D. Only block A will succeed. Under the old behavior,
+    // BufReaderLineWriter would then try to buffer B, C and D, but because its
+    // capacity is 10, it will only be able to buffer B and C. We don't want to
+    // buffer partial lines concurrent with whole lines, so the correct
+    // behavior is to buffer only block B (out to the newline)
     assert_eq!(writer.write(content).unwrap(), 11);
     assert_eq!(writer.get_ref().buffer, *b"AAAAA");
 
@@ -1029,11 +1029,11 @@ fn partial_multiline_buffering_without_full_line() {
     let content = b"AAAAABBBBBBBBBB\nCCCCC\nDDDDD";
 
     // When content is written, BufReaderLineWriter will try to write blocks A, B,
-    // and C. Only block A will succeed. Under the old behavior, BufReaderLineWriter
-    // would then try to buffer B and C, but because its capacity is 5,
-    // it will only be able to buffer part of B. Because it's not possible
-    // for it to buffer any complete lines, it should buffer as much of B as
-    // possible
+    // and C. Only block A will succeed. Under the old behavior,
+    // BufReaderLineWriter would then try to buffer B and C, but because its
+    // capacity is 5, it will only be able to buffer part of B. Because it's
+    // not possible for it to buffer any complete lines, it should buffer as
+    // much of B as possible
     assert_eq!(writer.write(content).unwrap(), 10);
     assert_eq!(writer.get_ref().buffer, *b"AAAAA");
 
@@ -1075,8 +1075,8 @@ impl Write for WriteRecorder {
 
 /// Test that a normal, formatted writeln only results in a single write
 /// call to the underlying writer. A naive implementation of
-/// BufReaderLineWriter::write_all results in two writes: one of the buffered data,
-/// and another of the final substring in the formatted set
+/// BufReaderLineWriter::write_all results in two writes: one of the buffered
+/// data, and another of the final substring in the formatted set
 #[test]
 fn single_formatted_write() {
     let writer = WriteRecorder::default();

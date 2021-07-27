@@ -175,9 +175,10 @@ impl AsyncStreamReader {
     /// Unlike [`async_std::io::stdin`], this `stdin` returns a stream which is
     /// unbuffered and unlocked.
     ///
-    /// This acquires a [`async_std::io::StdinLock`] (in a non-recursive way) to
-    /// prevent accesses to `async_std::io::Stdin` while this is live, and fails if a
-    /// `AsyncStreamReader` or `AsyncStreamDuplexer` for standard input already exists.
+    /// This acquires a [`async_std::io::StdinLock`] (in a non-recursive way)
+    /// to prevent accesses to `async_std::io::Stdin` while this is live,
+    /// and fails if a `AsyncStreamReader` or `AsyncStreamDuplexer` for
+    /// standard input already exists.
     #[inline]
     pub fn stdin() -> io::Result<Self> {
         todo!("async stdin")
@@ -185,7 +186,8 @@ impl AsyncStreamReader {
 
     /// Read from an open file, taking ownership of it.
     ///
-    /// This method can be passed a [`async_std::fs::File`] or similar `File` types.
+    /// This method can be passed a [`async_std::fs::File`] or similar `File`
+    /// types.
     #[inline]
     #[must_use]
     pub fn file<Filelike: IntoFilelike + Read + Write + Seek>(filelike: Filelike) -> Self {
@@ -289,13 +291,13 @@ impl AsyncStreamReader {
 impl AsyncStreamWriter {
     /// Write to standard output.
     ///
-    /// Unlike [`async_std::io::stdout`], this `stdout` returns a stream which is
-    /// unbuffered and unlocked.
+    /// Unlike [`async_std::io::stdout`], this `stdout` returns a stream which
+    /// is unbuffered and unlocked.
     ///
-    /// This acquires a [`async_std::io::StdoutLock`] (in a non-recursive way) to
-    /// prevent accesses to `async_std::io::Stdout` while this is live, and fails if
-    /// a `AsyncStreamWriter` or `AsyncStreamDuplexer` for standard output already
-    /// exists.
+    /// This acquires a [`async_std::io::StdoutLock`] (in a non-recursive way)
+    /// to prevent accesses to `async_std::io::Stdout` while this is live,
+    /// and fails if a `AsyncStreamWriter` or `AsyncStreamDuplexer` for
+    /// standard output already exists.
     #[inline]
     pub fn stdout() -> io::Result<Self> {
         todo!("async stdout")
@@ -303,7 +305,8 @@ impl AsyncStreamWriter {
 
     /// Write to an open file, taking ownership of it.
     ///
-    /// This method can be passed a [`async_std::fs::File`] or similar `File` types.
+    /// This method can be passed a [`async_std::fs::File`] or similar `File`
+    /// types.
     #[inline]
     #[must_use]
     pub fn file<Filelike: IntoFilelike + Read + Write + Seek>(filelike: Filelike) -> Self {
@@ -407,14 +410,16 @@ impl AsyncStreamWriter {
 impl AsyncStreamDuplexer {
     /// Duplex with stdin and stdout, taking ownership of them.
     ///
-    /// Unlike [`async_std::io::stdin`] and [`async_std::io::stdout`], this `stdin_stdout`
-    /// returns a stream which is unbuffered and unlocked.
+    /// Unlike [`async_std::io::stdin`] and [`async_std::io::stdout`], this
+    /// `stdin_stdout` returns a stream which is unbuffered and unlocked.
     ///
-    /// This acquires a [`async_std::io::StdinLock`] and a [`async_std::io::StdoutLock`]
-    /// (in non-recursive ways) to prevent accesses to [`async_std::io::Stdin`] and
-    /// [`async_std::io::Stdout`] while this is live, and fails if a `AsyncStreamReader`
-    /// for standard input, a `AsyncStreamWriter` for standard output, or a
-    /// `AsyncStreamDuplexer` for standard input and standard output already exist.
+    /// This acquires a [`async_std::io::StdinLock`] and a
+    /// [`async_std::io::StdoutLock`] (in non-recursive ways) to prevent
+    /// accesses to [`async_std::io::Stdin`] and [`async_std::io::Stdout`]
+    /// while this is live, and fails if a `AsyncStreamReader` for standard
+    /// input, a `AsyncStreamWriter` for standard output, or a
+    /// `AsyncStreamDuplexer` for standard input and standard output already
+    /// exist.
     #[inline]
     pub fn stdin_stdout() -> io::Result<Self> {
         todo!("async stdin_stdout")
