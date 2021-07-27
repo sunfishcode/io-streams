@@ -95,6 +95,24 @@ pub struct StreamDuplexer {
     resources: DuplexResources,
 }
 
+// The Windows [`HANDLE`] type may be transferred across and shared between
+// thread boundaries (despite containing a `*mut void`, which in general isn't
+// `Send` or `Sync`).
+//
+// [`HANDLE`]: std::os::windows::raw::HANDLE
+#[cfg(windows)]
+unsafe impl Send for StreamReader {}
+#[cfg(windows)]
+unsafe impl Sync for StreamReader {}
+#[cfg(windows)]
+unsafe impl Send for StreamWriter {}
+#[cfg(windows)]
+unsafe impl Sync for StreamWriter {}
+#[cfg(windows)]
+unsafe impl Send for StreamDuplexer {}
+#[cfg(windows)]
+unsafe impl Sync for StreamDuplexer {}
+
 /// Additional resources that need to be held in order to keep the stream live.
 enum ReadResources {
     File(File),
