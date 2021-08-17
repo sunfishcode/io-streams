@@ -31,7 +31,7 @@ use {
 #[cfg(not(windows))]
 use {
     io_lifetimes::{AsFd, BorrowedFd},
-    unsafe_io::os::posish::{AsRawReadWriteFd, AsReadWriteFd},
+    unsafe_io::os::rsix::{AsRawReadWriteFd, AsReadWriteFd},
 };
 #[cfg(not(target_os = "wasi"))]
 use {
@@ -340,7 +340,7 @@ impl StreamReader {
     pub fn bytes(bytes: &[u8]) -> io::Result<Self> {
         // If we can write it to a new pipe without blocking, do so.
         #[cfg(not(any(windows, target_os = "redox")))]
-        if bytes.len() <= posish::io::PIPE_BUF {
+        if bytes.len() <= rsix::io::PIPE_BUF {
             let (pipe_reader, mut pipe_writer) = pipe()?;
 
             pipe_writer.write_all(bytes)?;

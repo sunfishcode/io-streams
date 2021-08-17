@@ -24,7 +24,7 @@ use {duplex::HalfDuplex, socketpair::TokioSocketpairStream};
 #[cfg(not(windows))]
 use {
     io_lifetimes::{AsFd, BorrowedFd},
-    unsafe_io::os::posish::{AsRawReadWriteFd, AsReadWriteFd},
+    unsafe_io::os::rsix::{AsRawReadWriteFd, AsReadWriteFd},
 };
 #[cfg(not(target_os = "wasi"))]
 use {
