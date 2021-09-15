@@ -14,17 +14,20 @@
 
 This crate defines [`StreamReader`], [`StreamWriter`], and [`StreamDuplexer`]
 types which provide safe, owning, unbuffered, and unlocked access to a raw I/O
-stream, such as standard input, standard output, files, sockets, or pipes. It
-also supports a "piped thread" concept, where an arbitrary
-`Box<dyn Read + Send>` or `Box<dyn Write + Send>` can be provided, and the I/O
-is performed on a thread and connecting to the `StreamReader` or `StreamWriter`
-with a [pipe], and a "socketed thread" concept, where a provided function is
-called on a thread and connected to the main thread via a bidirectional socket.
+stream, such as standard input, standard output, files, sockets, pipes, or
+character devices. It also supports a "piped thread" concept, where an
+arbitrary `Box<dyn Read + Send>` or `Box<dyn Write + Send>` can be provided,
+and the I/O is performed on a thread and connecting to the `StreamReader` or
+`StreamWriter` with a [pipe], and a "socketed thread" concept, where a provided
+function is called on a thread and connected to the main thread via a
+bidirectional socket.
 
 This crate also defines [`AsyncStreamReader`], [`AsyncStreamWriter`], and
 [`AsyncStreamDuplexer`], which are async functions that work with `async-std`.
-Not all features are supported yet, and they aren't fully optimized yet,
-but basic file and socket support is in place.
+And [`TokioStreamReader`], [`TokioStreamWriter`], and [`TokioStreamDuplexer`],
+which are async functions that work with `tokio`. Not all features are
+supported yet, and they aren't fully optimized yet, but basic file and socket
+support is in place.
 
 On Posix-ish platforms, including limited support for WASI, these types just
 contain a single file descriptor (and implement [`AsFd`]), plus any
@@ -52,6 +55,9 @@ they are locked will block indefinitely.
 [`AsyncStreamReader`]: https://docs.rs/io-streams/latest/io_streams/struct.AsyncStreamReader.html
 [`AsyncStreamWriter`]: https://docs.rs/io-streams/latest/io_streams/struct.AsyncStreamWriter.html
 [`AsyncStreamDuplexer`]: https://docs.rs/io-streams/latest/io_streams/struct.AsyncStreamDuplexer.html
+[`TokioStreamReader`]: https://docs.rs/io-streams/latest/io_streams/struct.TokioStreamReader.html
+[`TokioStreamWriter`]: https://docs.rs/io-streams/latest/io_streams/struct.TokioStreamWriter.html
+[`TokioStreamDuplexer`]: https://docs.rs/io-streams/latest/io_streams/struct.TokioStreamDuplexer.html
 [`io_streams::BufDuplexer`]: https://docs.rs/io-streams/latest/io_streams/struct.BufDuplexer.html
 [`io_streams::BufReaderLineWriter`]: https://docs.rs/io-streams/latest/io_streams/struct.BufReaderLineWriter.html
 [`std::io::Stdin`]: https://doc.rust-lang.org/std/io/struct.Stdin.html
