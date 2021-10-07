@@ -17,6 +17,7 @@ fn main() {
             "windows_by_handle",  // https://github.com/rust-lang/rust/issues/63010
             "with_options",       // https://github.com/rust-lang/rust/issues/65439
             "write_all_vectored", // https://github.com/rust-lang/rust/issues/70436
+            "doc_cfg",            // https://github.com/rust-lang/rust/issues/43781
             // https://doc.rust-lang.org/unstable-book/library-features/windows-file-type-ext.html
             "windows_file_type_ext",
         ] {

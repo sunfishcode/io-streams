@@ -47,10 +47,14 @@ use_socketpair = ["socketpair", "duplex/socketpair", "system-interface/socketpai
 use_char_device = ["char-device", "duplex/char-device", "system-interface/char-device"]
 use_async_std = ["async-std", "unsafe-io/async-std", "io-lifetimes/async-std"]
 use_tokio = ["tokio", "unsafe-io/tokio", "io-lifetimes/tokio"]
-use_async_std_char_device = ["char-device/use_async_std", "duplex/use_async_std_char_device", "system-interface/char-device"]
-use_async_std_socketpair = ["socketpair/use_async_std", "duplex/use_async_std_socketpair", "system-interface/socketpair"]
-use_tokio_char_device = ["char-device/use_tokio", "duplex/use_tokio_char_device", "system-interface/char-device"]
-use_tokio_socketpair = ["socketpair/use_tokio", "duplex/use_tokio_socketpair", "system-interface/socketpair"]
+use_async_std_char_device = ["use_char_device", "char-device/use_async_std", "duplex/use_async_std_char_device", "system-interface/char-device"]
+use_async_std_socketpair = ["use_socketpair", "socketpair/use_async_std", "duplex/use_async_std_socketpair", "system-interface/socketpair"]
+use_tokio_char_device = ["use_char_device", "char-device/use_tokio", "duplex/use_tokio_char_device", "system-interface/char-device"]
+use_tokio_socketpair = ["use_socketpair", "socketpair/use_tokio", "duplex/use_tokio_socketpair", "system-interface/socketpair"]
+
+[package.metadata.docs.rs]
+features = ["use_async_std_char_device", "use_async_std_socketpair", "use_tokio_char_device", "use_tokio_socketpair"]
+rustdoc-args = ["--cfg", "feature=use_async_std_char_device,use_async_std_socketpair,use_tokio_char_device,use_tokio_socketpair"]
 
 [badges]
 maintenance = { status = "actively-developed" }
