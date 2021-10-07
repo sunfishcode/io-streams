@@ -582,7 +582,7 @@ impl StreamDuplexer {
 
     /// Duplex with an open character device, taking ownership of it.
     #[cfg(feature = "char-device")]
-    #[doc(cfg(feature = "char-device"))]
+    #[cfg_attr(doc_cfg, doc(cfg(feature = "char-device")))]
     #[inline]
     #[must_use]
     pub fn char_device(char_device: CharDevice) -> Self {
@@ -634,7 +634,10 @@ impl StreamDuplexer {
 
     /// Duplex with one end of a socketpair stream, taking ownership of it.
     #[cfg(all(not(target_os = "wasi"), feature = "socketpair"))]
-    #[doc(cfg(all(not(target_os = "wasi"), feature = "socketpair")))]
+    #[cfg_attr(
+        doc_cfg,
+        doc(cfg(all(not(target_os = "wasi"), feature = "socketpair")))
+    )]
     #[must_use]
     pub fn socketpair_stream(stream: SocketpairStream) -> Self {
         let handle = stream.as_raw_grip();
@@ -682,7 +685,10 @@ impl StreamDuplexer {
     /// synchronizes with the thread to ensure that is has completed writing
     /// all pending output.
     #[cfg(all(not(target_os = "wasi"), feature = "socketpair"))]
-    #[doc(cfg(all(not(target_os = "wasi"), feature = "socketpair")))]
+    #[cfg_attr(
+        doc_cfg,
+        doc(cfg(all(not(target_os = "wasi"), feature = "socketpair")))
+    )]
     pub fn socketed_thread_read_first(
         mut boxed_duplex: Box<dyn HalfDuplex + Send>,
     ) -> io::Result<Self> {
@@ -711,7 +717,10 @@ impl StreamDuplexer {
     /// synchronizes with the thread to ensure that is has completed writing
     /// all pending output.
     #[cfg(all(not(target_os = "wasi"), feature = "socketpair"))]
-    #[doc(cfg(all(not(target_os = "wasi"), feature = "socketpair")))]
+    #[cfg_attr(
+        doc_cfg,
+        doc(cfg(all(not(target_os = "wasi"), feature = "socketpair")))
+    )]
     pub fn socketed_thread_write_first(
         mut boxed_duplex: Box<dyn HalfDuplex + Send>,
     ) -> io::Result<Self> {
@@ -744,7 +753,10 @@ impl StreamDuplexer {
     /// synchronizes with the thread to ensure that is has completed writing
     /// all pending output.
     #[cfg(all(not(target_os = "wasi"), feature = "socketpair"))]
-    #[doc(cfg(all(not(target_os = "wasi"), feature = "socketpair")))]
+    #[cfg_attr(
+        doc_cfg,
+        doc(cfg(all(not(target_os = "wasi"), feature = "socketpair")))
+    )]
     pub fn socketed_thread(
         mut boxed_duplex: Box<dyn HalfDuplexReadReady + Send>,
     ) -> io::Result<Self> {
@@ -786,7 +798,10 @@ impl StreamDuplexer {
     /// synchronizes with the thread to ensure that is has completed writing
     /// all pending output.
     #[cfg(all(not(target_os = "wasi"), feature = "socketpair"))]
-    #[doc(cfg(all(not(target_os = "wasi"), feature = "socketpair")))]
+    #[cfg_attr(
+        doc_cfg,
+        doc(cfg(all(not(target_os = "wasi"), feature = "socketpair")))
+    )]
     pub fn socketed_thread_func(
         func: Box<dyn Send + FnOnce(SocketpairStream) -> io::Result<SocketpairStream>>,
     ) -> io::Result<Self> {
@@ -1390,7 +1405,10 @@ impl Debug for StreamDuplexer {
 /// A trait that combines [`HalfDuplex`] and [`ReadReady`]. Implemented via
 /// blanket implementation.
 #[cfg(all(not(target_os = "wasi"), feature = "socketpair"))]
-#[doc(cfg(all(not(target_os = "wasi"), feature = "socketpair")))]
+#[cfg_attr(
+    doc_cfg,
+    doc(cfg(all(not(target_os = "wasi"), feature = "socketpair")))
+)]
 pub trait HalfDuplexReadReady: HalfDuplex + ReadReady {}
 
 #[cfg(all(not(target_os = "wasi"), feature = "socketpair"))]
