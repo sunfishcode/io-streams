@@ -54,6 +54,7 @@ use_tokio_socketpair = ["use_socketpair", "socketpair/use_tokio", "duplex/use_to
 
 [package.metadata.docs.rs]
 features = ["use_async_std_char_device", "use_async_std_socketpair", "use_tokio_char_device", "use_tokio_socketpair"]
+rustdoc-args = ["--cfg", "doc_cfg"]
 
 [badges]
 maintenance = { status = "actively-developed" }
