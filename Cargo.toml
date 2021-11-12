@@ -14,39 +14,39 @@ exclude = ["/.github"]
 rustc_version = "0.4.0"
 
 [dependencies]
-async-std = { version = "1.9.0", optional = true }
-char-device = { version = "0.7.0", optional = true }
-duplex = "0.7.0"
-layered-io = { version = "0.8.0", optional = true }
+async-std = { version = "1.10.0", optional = true }
+char-device = { version = "0.8.0", optional = true }
+duplex = "0.8.0"
+layered-io = { version = "0.9.0", optional = true }
 memchr = "2.3.4"
 parking = "2.0.0"
-socketpair = { version = "0.10.0", optional = true }
-system-interface = { version = "0.15.0", features = ["use_os_pipe", "socketpair"] }
-terminal-io = { version = "0.7.0", optional = true }
+socketpair = { version = "0.11.0", optional = true }
+system-interface = { version = "0.16.0", features = ["use_os_pipe", "socketpair"] }
+terminal-io = { version = "0.8.0", optional = true }
 tokio = { version = "1.8.1", optional = true, features = ["fs", "net"] }
-unsafe-io = { version = "0.9.1", features = ["os_pipe"] }
-utf8-io = { version = "0.7.0", optional = true }
-io-lifetimes = { version = "0.3.0", default-features = false }
+io-extras = { version = "0.11.0", features = ["os_pipe"] }
+utf8-io = { version = "0.8.0", optional = true }
+io-lifetimes = { version = "0.3.3", default-features = false }
 
 # WASI doesn't support pipes yet
 [target.'cfg(not(target_os = "wasi"))'.dependencies]
 os_pipe = "0.9.2"
 
 [target.'cfg(not(windows))'.dependencies]
-rsix = "0.23.0"
+rustix = "0.26.2"
 
 [dev-dependencies]
 anyhow = "1.0.38"
-cap-tempfile = "0.19.1"
-char-device = "0.7.0"
-duplex = { version = "0.7.0", features = ["char-device"] }
+cap-tempfile = "0.21.0"
+char-device = "0.8.0"
+duplex = { version = "0.8.0", features = ["char-device"] }
 
 [features]
 default = []
 use_socketpair = ["socketpair", "duplex/socketpair", "system-interface/socketpair"]
 use_char_device = ["char-device", "duplex/char-device", "system-interface/char-device"]
-use_async_std = ["async-std", "unsafe-io/async-std", "io-lifetimes/async-std"]
-use_tokio = ["tokio", "unsafe-io/tokio", "io-lifetimes/tokio"]
+use_async_std = ["async-std", "io-lifetimes/async-std", "io-lifetimes/async-std"]
+use_tokio = ["tokio", "io-lifetimes/tokio", "io-lifetimes/tokio"]
 use_async_std_char_device = ["use_char_device", "char-device/use_async_std", "duplex/use_async_std_char_device", "system-interface/char-device"]
 use_async_std_socketpair = ["use_socketpair", "socketpair/use_async_std", "duplex/use_async_std_socketpair", "system-interface/socketpair"]
 use_tokio_char_device = ["use_char_device", "char-device/use_tokio", "duplex/use_tokio_char_device", "system-interface/char-device"]

@@ -12,23 +12,23 @@ use async_std::os::wasi::io::{AsRawFd, RawFd};
 #[cfg(feature = "char-device")]
 use char_device::AsyncStdCharDevice;
 use duplex::Duplex;
+use io_extras::grip::{AsRawGrip, AsRawReadWriteGrip};
+#[cfg(windows)]
+use io_extras::os::windows::{
+    AsHandleOrSocket, AsRawHandleOrSocket, AsRawReadWriteHandleOrSocket, AsReadWriteHandleOrSocket,
+    BorrowedHandleOrSocket, RawHandleOrSocket,
+};
 use io_lifetimes::{FromFilelike, FromSocketlike, IntoFilelike, IntoSocketlike};
 use std::fmt::{self, Debug};
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use system_interface::io::ReadReady;
-#[cfg(windows)]
-use unsafe_io::os::windows::{
-    AsHandleOrSocket, AsRawHandleOrSocket, AsRawReadWriteHandleOrSocket, AsReadWriteHandleOrSocket,
-    BorrowedHandleOrSocket, RawHandleOrSocket,
-};
-use unsafe_io::{AsRawGrip, AsRawReadWriteGrip};
 #[cfg(all(not(target_os = "wasi"), feature = "socketpair"))]
 use {duplex::HalfDuplex, socketpair::AsyncStdSocketpairStream};
 #[cfg(not(windows))]
 use {
+    io_extras::os::rustix::{AsRawReadWriteFd, AsReadWriteFd},
     io_lifetimes::{AsFd, BorrowedFd},
-    unsafe_io::os::rsix::{AsRawReadWriteFd, AsReadWriteFd},
 };
 #[cfg(not(target_os = "wasi"))]
 use {

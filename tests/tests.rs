@@ -199,7 +199,7 @@ impl Write for Mock {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         assert!(self.0);
         self.0 = false;
-        assert_eq!(buf, &vec![0xcd_u8; buf.len()]);
+        assert_eq!(buf, &vec![0xcd_u8; buf.len()][..]);
         Ok(buf.len())
     }
 
