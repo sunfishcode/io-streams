@@ -11,16 +11,16 @@ use std::io::{self, BufRead, Error, ErrorKind, IoSlice, IoSliceMut, Read, Write}
 use std::{cmp, fmt};
 #[cfg(not(windows))]
 use {
+    io_extras::os::rustix::{AsRawFd, RawFd},
     io_lifetimes::{AsFd, BorrowedFd},
-    unsafe_io::os::rsix::{AsRawFd, RawFd},
 };
 #[cfg(windows)]
 use {
-    io_lifetimes::{AsHandle, AsSocket, BorrowedHandle, BorrowedSocket},
-    std::os::windows::io::{AsRawHandle, AsRawSocket, RawHandle, RawSocket},
-    unsafe_io::os::windows::{
+    io_extras::os::windows::{
         AsHandleOrSocket, AsRawHandleOrSocket, BorrowedHandleOrSocket, RawHandleOrSocket,
     },
+    io_lifetimes::{AsHandle, AsSocket, BorrowedHandle, BorrowedSocket},
+    std::os::windows::io::{AsRawHandle, AsRawSocket, RawHandle, RawSocket},
 };
 
 /// Wraps a reader and writer and buffers their output.

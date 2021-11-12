@@ -2,6 +2,13 @@ use crate::lockers::{StdinLocker, StdoutLocker};
 #[cfg(feature = "char-device")]
 use char_device::CharDevice;
 use duplex::Duplex;
+use io_extras::grip::{AsRawGrip, AsRawReadWriteGrip, FromRawGrip, RawGrip};
+#[cfg(windows)]
+use io_extras::os::windows::{
+    AsHandleOrSocket, AsRawHandleOrSocket, AsRawReadWriteHandleOrSocket, AsReadWriteHandleOrSocket,
+    BorrowedHandleOrSocket, RawHandleOrSocket,
+};
+use io_extras::raw::{RawReadable, RawWriteable};
 use io_lifetimes::{FromFilelike, FromSocketlike, IntoFilelike, IntoSocketlike};
 use std::fmt::{self, Arguments, Debug};
 use std::fs::{File, OpenOptions};
@@ -15,14 +22,6 @@ use std::os::unix::{
 #[cfg(target_os = "wasi")]
 use std::os::wasi::io::{AsRawFd, RawFd};
 use system_interface::io::{Peek, ReadReady};
-#[cfg(windows)]
-use unsafe_io::os::windows::{
-    AsHandleOrSocket, AsRawHandleOrSocket, AsRawReadWriteHandleOrSocket, AsReadWriteHandleOrSocket,
-    BorrowedHandleOrSocket, RawHandleOrSocket,
-};
-use unsafe_io::{
-    AsRawGrip, AsRawReadWriteGrip, FromRawGrip, RawGrip, UnsafeReadable, UnsafeWriteable,
-};
 #[cfg(all(not(target_os = "wasi"), feature = "socketpair"))]
 use {
     duplex::HalfDuplex,
@@ -30,8 +29,8 @@ use {
 };
 #[cfg(not(windows))]
 use {
+    io_extras::os::rustix::{AsRawReadWriteFd, AsReadWriteFd},
     io_lifetimes::{AsFd, BorrowedFd},
-    unsafe_io::os::rsix::{AsRawReadWriteFd, AsReadWriteFd},
 };
 #[cfg(not(target_os = "wasi"))]
 use {
@@ -55,7 +54,7 @@ use {
 ///
 /// [`BufReader`]: std::io::BufReader
 pub struct StreamReader {
-    handle: UnsafeReadable,
+    handle: RawReadable,
     resources: ReadResources,
 }
 
@@ -72,7 +71,7 @@ pub struct StreamReader {
 /// [`BufWriter`]: std::io::BufWriter
 /// [`LineWriter`]: std::io::LineWriter
 pub struct StreamWriter {
-    handle: UnsafeWriteable,
+    handle: RawWriteable,
     resources: WriteResources,
 }
 
@@ -90,8 +89,8 @@ pub struct StreamWriter {
 /// [`File`]: std::fs::File
 /// [character device files]: https://docs.rs/char-device/latest/char_device/struct.CharDevice.html
 pub struct StreamDuplexer {
-    read_handle: UnsafeReadable,
-    write_handle: UnsafeWriteable,
+    read_handle: RawReadable,
+    write_handle: RawWriteable,
     resources: DuplexResources,
 }
 
@@ -340,7 +339,7 @@ impl StreamReader {
     pub fn bytes(bytes: &[u8]) -> io::Result<Self> {
         // If we can write it to a new pipe without blocking, do so.
         #[cfg(not(any(windows, target_os = "redox")))]
-        if bytes.len() <= rsix::io::PIPE_BUF {
+        if bytes.len() <= rustix::io::PIPE_BUF {
             let (pipe_reader, mut pipe_writer) = pipe()?;
 
             pipe_writer.write_all(bytes)?;
@@ -359,7 +358,7 @@ impl StreamReader {
     #[must_use]
     fn handle(handle: RawGrip, resources: ReadResources) -> Self {
         Self {
-            handle: unsafe { UnsafeReadable::from_raw_grip(handle) },
+            handle: unsafe { RawReadable::from_raw_grip(handle) },
             resources,
         }
     }
@@ -530,7 +529,7 @@ impl StreamWriter {
     #[inline]
     fn handle(handle: RawGrip, resources: WriteResources) -> Self {
         Self {
-            handle: unsafe { UnsafeWriteable::from_raw_grip(handle) },
+            handle: unsafe { RawWriteable::from_raw_grip(handle) },
             resources,
         }
     }
@@ -836,8 +835,8 @@ impl StreamDuplexer {
     #[must_use]
     fn handle(handle: RawGrip, resources: DuplexResources) -> Self {
         Self {
-            read_handle: unsafe { UnsafeReadable::from_raw_grip(handle) },
-            write_handle: unsafe { UnsafeWriteable::from_raw_grip(handle) },
+            read_handle: unsafe { RawReadable::from_raw_grip(handle) },
+            write_handle: unsafe { RawWriteable::from_raw_grip(handle) },
             resources,
         }
     }
@@ -846,8 +845,8 @@ impl StreamDuplexer {
     #[must_use]
     fn two_handles(read: RawGrip, write: RawGrip, resources: DuplexResources) -> Self {
         Self {
-            read_handle: unsafe { UnsafeReadable::from_raw_grip(read) },
-            write_handle: unsafe { UnsafeWriteable::from_raw_grip(write) },
+            read_handle: unsafe { RawReadable::from_raw_grip(read) },
+            write_handle: unsafe { RawWriteable::from_raw_grip(write) },
             resources,
         }
     }

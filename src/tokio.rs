@@ -2,6 +2,12 @@ use crate::lockers::{StdinLocker, StdoutLocker};
 #[cfg(feature = "char-device")]
 use char_device::TokioCharDevice;
 use duplex::Duplex;
+use io_extras::grip::{AsRawGrip, AsRawReadWriteGrip};
+#[cfg(windows)]
+use io_extras::os::windows::{
+    AsHandleOrSocket, AsRawHandleOrSocket, AsRawReadWriteHandleOrSocket, AsReadWriteHandleOrSocket,
+    BorrowedHandleOrSocket, RawHandleOrSocket,
+};
 use io_lifetimes::{FromFilelike, IntoFilelike};
 use std::fmt::{self, Debug};
 use std::io::IoSlice;
@@ -13,18 +19,12 @@ use system_interface::io::ReadReady;
 use tokio::fs::File;
 use tokio::io::{self, AsyncRead, AsyncSeek, AsyncWrite, ReadBuf};
 use tokio::net::TcpStream;
-#[cfg(windows)]
-use unsafe_io::os::windows::{
-    AsHandleOrSocket, AsRawHandleOrSocket, AsRawReadWriteHandleOrSocket, AsReadWriteHandleOrSocket,
-    BorrowedHandleOrSocket, RawHandleOrSocket,
-};
-use unsafe_io::{AsRawGrip, AsRawReadWriteGrip};
 #[cfg(all(not(target_os = "wasi"), feature = "socketpair"))]
 use {duplex::HalfDuplex, socketpair::TokioSocketpairStream};
 #[cfg(not(windows))]
 use {
+    io_extras::os::rustix::{AsRawReadWriteFd, AsReadWriteFd},
     io_lifetimes::{AsFd, BorrowedFd},
-    unsafe_io::os::rsix::{AsRawReadWriteFd, AsReadWriteFd},
 };
 #[cfg(not(target_os = "wasi"))]
 use {

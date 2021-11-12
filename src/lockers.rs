@@ -16,11 +16,11 @@ use std::thread::{self, JoinHandle};
 use system_interface::io::ReadReady;
 #[cfg(windows)]
 use {
-    io_lifetimes::{AsHandle, BorrowedHandle},
-    std::os::windows::io::{AsRawHandle, RawHandle},
-    unsafe_io::os::windows::{
+    io_extras::os::windows::{
         AsHandleOrSocket, AsRawHandleOrSocket, BorrowedHandleOrSocket, RawHandleOrSocket,
     },
+    io_lifetimes::{AsHandle, BorrowedHandle},
+    std::os::windows::io::{AsRawHandle, RawHandle},
 };
 
 // Statically track whether stdin and stdout are claimed. This allows us to
