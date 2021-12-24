@@ -10,9 +10,6 @@ categories = ["rust-patterns"]
 repository = "https://github.com/sunfishcode/io-streams"
 exclude = ["/.github"]
 
-[build-dependencies]
-rustc_version = "0.4.0"
-
 [dependencies]
 async-std = { version = "1.10.0", optional = true }
 char-device = { version = "0.10.0", optional = true }
