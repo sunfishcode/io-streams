@@ -225,7 +225,7 @@ impl AsRawHandleOrSocket for StdoutLocker {
 impl AsFd for StdinLocker {
     #[inline]
     fn as_fd(&self) -> BorrowedFd<'_> {
-        unsafe { BorrowedFd::borrow_raw_fd(self.raw_fd) }
+        unsafe { BorrowedFd::borrow_raw(self.raw_fd) }
     }
 }
 
@@ -233,7 +233,7 @@ impl AsFd for StdinLocker {
 impl AsFd for StdoutLocker {
     #[inline]
     fn as_fd(&self) -> BorrowedFd<'_> {
-        unsafe { BorrowedFd::borrow_raw_fd(self.raw_fd) }
+        unsafe { BorrowedFd::borrow_raw(self.raw_fd) }
     }
 }
 
@@ -241,7 +241,7 @@ impl AsFd for StdoutLocker {
 impl AsHandle for StdinLocker {
     #[inline]
     fn as_handle(&self) -> BorrowedHandle<'_> {
-        unsafe { BorrowedHandle::borrow_raw_handle(self.raw_handle) }
+        unsafe { BorrowedHandle::borrow_raw(self.raw_handle) }
     }
 }
 
@@ -249,7 +249,7 @@ impl AsHandle for StdinLocker {
 impl AsHandle for StdoutLocker {
     #[inline]
     fn as_handle(&self) -> BorrowedHandle<'_> {
-        unsafe { BorrowedHandle::borrow_raw_handle(self.raw_handle) }
+        unsafe { BorrowedHandle::borrow_raw(self.raw_handle) }
     }
 }
 
@@ -258,9 +258,9 @@ impl AsHandleOrSocket for StdinLocker {
     #[inline]
     fn as_handle_or_socket(&self) -> BorrowedHandleOrSocket<'_> {
         unsafe {
-            BorrowedHandleOrSocket::borrow_raw_handle_or_socket(
-                RawHandleOrSocket::unowned_from_raw_handle(self.raw_handle),
-            )
+            BorrowedHandleOrSocket::borrow_raw(RawHandleOrSocket::unowned_from_raw_handle(
+                self.raw_handle,
+            ))
         }
     }
 }
@@ -270,9 +270,9 @@ impl AsHandleOrSocket for StdoutLocker {
     #[inline]
     fn as_handle_or_socket(&self) -> BorrowedHandleOrSocket<'_> {
         unsafe {
-            BorrowedHandleOrSocket::borrow_raw_handle_or_socket(
-                RawHandleOrSocket::unowned_from_raw_handle(self.raw_handle),
-            )
+            BorrowedHandleOrSocket::borrow_raw(RawHandleOrSocket::unowned_from_raw_handle(
+                self.raw_handle,
+            ))
         }
     }
 }

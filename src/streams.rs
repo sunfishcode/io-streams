@@ -1246,7 +1246,7 @@ impl AsRawReadWriteHandleOrSocket for StreamDuplexer {
 impl AsFd for StreamReader {
     #[inline]
     fn as_fd(&self) -> BorrowedFd<'_> {
-        unsafe { BorrowedFd::borrow_raw_fd(self.handle.as_raw_fd()) }
+        unsafe { BorrowedFd::borrow_raw(self.handle.as_raw_fd()) }
     }
 }
 
@@ -1254,7 +1254,7 @@ impl AsFd for StreamReader {
 impl AsFd for StreamWriter {
     #[inline]
     fn as_fd(&self) -> BorrowedFd<'_> {
-        unsafe { BorrowedFd::borrow_raw_fd(self.handle.as_raw_fd()) }
+        unsafe { BorrowedFd::borrow_raw(self.handle.as_raw_fd()) }
     }
 }
 
@@ -1262,12 +1262,12 @@ impl AsFd for StreamWriter {
 impl AsReadWriteFd for StreamDuplexer {
     #[inline]
     fn as_read_fd(&self) -> BorrowedFd<'_> {
-        unsafe { BorrowedFd::borrow_raw_fd(self.read_handle.as_raw_fd()) }
+        unsafe { BorrowedFd::borrow_raw(self.read_handle.as_raw_fd()) }
     }
 
     #[inline]
     fn as_write_fd(&self) -> BorrowedFd<'_> {
-        unsafe { BorrowedFd::borrow_raw_fd(self.write_handle.as_raw_fd()) }
+        unsafe { BorrowedFd::borrow_raw(self.write_handle.as_raw_fd()) }
     }
 }
 
@@ -1275,11 +1275,7 @@ impl AsReadWriteFd for StreamDuplexer {
 impl AsHandleOrSocket for StreamReader {
     #[inline]
     fn as_handle_or_socket(&self) -> BorrowedHandleOrSocket<'_> {
-        unsafe {
-            BorrowedHandleOrSocket::borrow_raw_handle_or_socket(
-                self.handle.as_raw_handle_or_socket(),
-            )
-        }
+        unsafe { BorrowedHandleOrSocket::borrow_raw(self.handle.as_raw_handle_or_socket()) }
     }
 }
 
@@ -1287,11 +1283,7 @@ impl AsHandleOrSocket for StreamReader {
 impl AsHandleOrSocket for StreamWriter {
     #[inline]
     fn as_handle_or_socket(&self) -> BorrowedHandleOrSocket<'_> {
-        unsafe {
-            BorrowedHandleOrSocket::borrow_raw_handle_or_socket(
-                self.handle.as_raw_handle_or_socket(),
-            )
-        }
+        unsafe { BorrowedHandleOrSocket::borrow_raw(self.handle.as_raw_handle_or_socket()) }
     }
 }
 
@@ -1299,20 +1291,12 @@ impl AsHandleOrSocket for StreamWriter {
 impl AsReadWriteHandleOrSocket for StreamDuplexer {
     #[inline]
     fn as_read_handle_or_socket(&self) -> BorrowedHandleOrSocket<'_> {
-        unsafe {
-            BorrowedHandleOrSocket::borrow_raw_handle_or_socket(
-                self.read_handle.as_raw_handle_or_socket(),
-            )
-        }
+        unsafe { BorrowedHandleOrSocket::borrow_raw(self.read_handle.as_raw_handle_or_socket()) }
     }
 
     #[inline]
     fn as_write_handle_or_socket(&self) -> BorrowedHandleOrSocket<'_> {
-        unsafe {
-            BorrowedHandleOrSocket::borrow_raw_handle_or_socket(
-                self.write_handle.as_raw_handle_or_socket(),
-            )
-        }
+        unsafe { BorrowedHandleOrSocket::borrow_raw(self.write_handle.as_raw_handle_or_socket()) }
     }
 }
 
