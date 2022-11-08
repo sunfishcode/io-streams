@@ -49,6 +49,10 @@ corresponding streams open, to prevent accidental mixing of buffered and
 unbuffered output on the same stream. Attempts to use the buffered streams when
 they are locked will block indefinitely.
 
+Support for async-std and tokio in char-device and socketpair is temporarily
+disabled until those crates contain the needed implementations of the
+I/O safety traits.
+
 [`StreamReader`]: https://docs.rs/io-streams/latest/io_streams/struct.StreamReader.html
 [`StreamWriter`]: https://docs.rs/io-streams/latest/io_streams/struct.StreamWriter.html
 [`StreamDuplexer`]: https://docs.rs/io-streams/latest/io_streams/struct.StreamDuplexer.html
