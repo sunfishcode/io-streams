@@ -50,7 +50,7 @@ use_tokio = ["tokio", "io-lifetimes/tokio", "io-lifetimes/tokio"]
 #use_tokio_socketpair = ["use_socketpair", "socketpair/use_tokio", "duplex/use_tokio_socketpair", "system-interface/socketpair"]
 
 [package.metadata.docs.rs]
-features = [ "use_tokio_char_device", "use_tokio_socketpair"]
-#"use_async_std_char_device", "use_async_std_socketpair"
+features = []
+#"use_async_std_char_device", "use_async_std_socketpair", "use_tokio_char_device", "use_tokio_socketpair"
 
 rustdoc-args = ["--cfg", "doc_cfg"]
