@@ -132,6 +132,7 @@ enum ReadResources {
 }
 
 /// Additional resources that need to be held in order to keep the stream live.
+#[allow(dead_code)] // Fields are never explicitly used, but held because of their `Drop`.
 enum WriteResources {
     File(File),
     TcpStream(TcpStream),
