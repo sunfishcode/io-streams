@@ -1,4 +1,4 @@
-use crate::lockers::{StdinLocker, StdoutLocker};
+use crate::lockers::{StderrLocker, StdinLocker, StdoutLocker};
 #[cfg(feature = "char-device")]
 use char_device::CharDevice;
 use duplex::Duplex;
@@ -141,6 +141,7 @@ enum WriteResources {
     #[cfg(not(target_os = "wasi"))] // WASI doesn't support pipes yet
     PipeWriter(PipeWriter),
     Stdout(StdoutLocker),
+    Stderr(StderrLocker),
     #[cfg(not(target_os = "wasi"))] // WASI doesn't support pipes yet
     PipedThread(Option<(PipeWriter, JoinHandle<io::Result<Box<dyn Write + Send>>>)>),
     #[cfg(not(target_os = "wasi"))] // WASI doesn't support pipes yet
@@ -407,6 +408,38 @@ impl StreamWriter {
         let handle = RawHandleOrSocket::stdout();
 
         Ok(Self::handle(handle, WriteResources::Stdout(stdout_locker)))
+    }
+
+    /// Write to standard error.
+    ///
+    /// Like [`std::io::stderr`], this `stderr` returns a stream which is
+    /// unbuffered. However, unlike [`std::io::stderr`], the stream is also
+    /// unlocked.
+    ///
+    /// Since it is unbuffered, it is often beneficial to wrap the resulting
+    /// `StreamWriter` in a [`BufWriter`] or [`LineWriter`].
+    ///
+    /// This acquires a [`std::io::StderrLock`] (in a non-recursive way) to
+    /// prevent accesses to `std::io::Stderr` while this is live, and fails if
+    /// a `StreamWriter` or `StreamDuplexer` for standard output already
+    /// exists.
+    ///
+    /// [`BufWriter`]: std::io::BufWriter
+    /// [`LineWriter`]: std::io::LineWriter
+    #[inline]
+    pub fn stderr() -> io::Result<Self> {
+        let stderr_locker = StderrLocker::new()?;
+
+        // Obtain stdout's handle.
+        #[cfg(not(windows))]
+        let handle = stderr_locker.as_raw_fd();
+
+        // On Windows, stdout may be connected to a UTF-16 console, which
+        // `RawHandleOrSocket` can take care of for us.
+        #[cfg(windows)]
+        let handle = RawHandleOrSocket::stderr();
+
+        Ok(Self::handle(handle, WriteResources::Stderr(stderr_locker)))
     }
 
     /// Write to an open file, taking ownership of it.
