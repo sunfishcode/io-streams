@@ -615,7 +615,7 @@ impl StreamDuplexer {
 
     /// Duplex with an open character device, taking ownership of it.
     #[cfg(feature = "char-device")]
-    #[cfg_attr(doc_cfg, doc(cfg(feature = "char-device")))]
+    #[cfg_attr(docsrs, doc(cfg(feature = "char-device")))]
     #[inline]
     #[must_use]
     pub fn char_device(char_device: CharDevice) -> Self {
@@ -668,7 +668,7 @@ impl StreamDuplexer {
     /// Duplex with one end of a socketpair stream, taking ownership of it.
     #[cfg(all(not(target_os = "wasi"), feature = "socketpair"))]
     #[cfg_attr(
-        doc_cfg,
+        docsrs,
         doc(cfg(all(not(target_os = "wasi"), feature = "socketpair")))
     )]
     #[must_use]
@@ -719,7 +719,7 @@ impl StreamDuplexer {
     /// all pending output.
     #[cfg(all(not(target_os = "wasi"), feature = "socketpair"))]
     #[cfg_attr(
-        doc_cfg,
+        docsrs,
         doc(cfg(all(not(target_os = "wasi"), feature = "socketpair")))
     )]
     pub fn socketed_thread_read_first(
@@ -751,7 +751,7 @@ impl StreamDuplexer {
     /// all pending output.
     #[cfg(all(not(target_os = "wasi"), feature = "socketpair"))]
     #[cfg_attr(
-        doc_cfg,
+        docsrs,
         doc(cfg(all(not(target_os = "wasi"), feature = "socketpair")))
     )]
     pub fn socketed_thread_write_first(
@@ -787,7 +787,7 @@ impl StreamDuplexer {
     /// all pending output.
     #[cfg(all(not(target_os = "wasi"), feature = "socketpair"))]
     #[cfg_attr(
-        doc_cfg,
+        docsrs,
         doc(cfg(all(not(target_os = "wasi"), feature = "socketpair")))
     )]
     pub fn socketed_thread(
@@ -832,7 +832,7 @@ impl StreamDuplexer {
     /// all pending output.
     #[cfg(all(not(target_os = "wasi"), feature = "socketpair"))]
     #[cfg_attr(
-        doc_cfg,
+        docsrs,
         doc(cfg(all(not(target_os = "wasi"), feature = "socketpair")))
     )]
     pub fn socketed_thread_func(
@@ -1423,7 +1423,7 @@ impl Debug for StreamDuplexer {
 /// blanket implementation.
 #[cfg(all(not(target_os = "wasi"), feature = "socketpair"))]
 #[cfg_attr(
-    doc_cfg,
+    docsrs,
     doc(cfg(all(not(target_os = "wasi"), feature = "socketpair")))
 )]
 pub trait HalfDuplexReadReady: HalfDuplex + ReadReady {}
