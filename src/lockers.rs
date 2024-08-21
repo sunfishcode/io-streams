@@ -232,7 +232,6 @@ impl Drop for StdoutLocker {
     }
 }
 
-
 impl Drop for StderrLocker {
     #[inline]
     fn drop(&mut self) {

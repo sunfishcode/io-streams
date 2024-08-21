@@ -53,4 +53,21 @@ use_tokio = ["tokio", "io-lifetimes/tokio"]
 features = []
 #"use_async_std_char_device", "use_async_std_socketpair", "use_tokio_char_device", "use_tokio_socketpair"
 
-rustdoc-args = ["--cfg", "doc_cfg"]
+[lints.rust.unexpected_cfgs]
+level = "warn"
+check-cfg = [
+    'cfg(bench)',
+    'cfg(read_initializer)',
+    'cfg(can_vector)',
+    'cfg(clamp)',
+    'cfg(extend_one)',
+    'cfg(pattern)',
+    'cfg(seek_stream_len)',
+    'cfg(shrink_to)',
+    'cfg(toowned_clone_into)',
+    'cfg(try_reserve)',
+    'cfg(unix_socket_peek)',
+    'cfg(windows_by_handle)',
+    'cfg(write_all_vectored)',
+    'cfg(windows_file_type_ext)',
+]
