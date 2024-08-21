@@ -5,7 +5,7 @@ use cap_tempfile::{ambient_authority, tempdir, TempDir};
 #[cfg(not(target_os = "wasi"))]
 use io_streams::StreamDuplexer;
 use io_streams::{StreamReader, StreamWriter};
-use std::io::{self, copy, Read, Write};
+use std::io::{copy, Read, Write};
 #[cfg(all(not(target_os = "wasi"), feature = "socketpair"))]
 use {socketpair::SocketpairStream, std::str};
 
@@ -155,7 +155,7 @@ fn test_null_duplex() -> anyhow::Result<()> {
 #[test]
 fn test_socketed_thread_func() -> anyhow::Result<()> {
     let mut thread = StreamDuplexer::socketed_thread_func(Box::new(
-        |mut stream: SocketpairStream| -> io::Result<SocketpairStream> {
+        |mut stream: SocketpairStream| -> std::io::Result<SocketpairStream> {
             let mut buf = [0_u8; 4096];
             let n = stream.read(&mut buf)?;
             assert_eq!(str::from_utf8(&buf[..n]).unwrap(), "hello world\n");
@@ -182,10 +182,12 @@ fn test_socketed_thread_func() -> anyhow::Result<()> {
     Ok(())
 }
 
+#[cfg(all(not(target_os = "wasi"), feature = "socketpair"))]
 struct Mock(bool);
 
+#[cfg(all(not(target_os = "wasi"), feature = "socketpair"))]
 impl Read for Mock {
-    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
         assert!(!self.0);
         self.0 = true;
         assert!(!buf.is_empty());
@@ -195,21 +197,23 @@ impl Read for Mock {
     }
 }
 
+#[cfg(all(not(target_os = "wasi"), feature = "socketpair"))]
 impl Write for Mock {
-    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
         assert!(self.0);
         self.0 = false;
         assert_eq!(buf, &vec![0xcd_u8; buf.len()][..]);
         Ok(buf.len())
     }
 
-    fn flush(&mut self) -> io::Result<()> {
+    fn flush(&mut self) -> std::io::Result<()> {
         Ok(())
     }
 }
 
+#[cfg(all(not(target_os = "wasi"), feature = "socketpair"))]
 impl system_interface::io::ReadReady for Mock {
-    fn num_ready_bytes(&self) -> io::Result<u64> {
+    fn num_ready_bytes(&self) -> std::io::Result<u64> {
         if self.0 {
             Ok(0)
         } else {
@@ -218,6 +222,7 @@ impl system_interface::io::ReadReady for Mock {
     }
 }
 
+#[cfg(all(not(target_os = "wasi"), feature = "socketpair"))]
 impl duplex::Duplex for Mock {}
 
 #[cfg(all(not(target_os = "wasi"), feature = "socketpair"))]

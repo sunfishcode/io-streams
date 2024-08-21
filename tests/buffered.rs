@@ -469,14 +469,17 @@ fn panic_in_write_doesnt_flush_in_drop() {
     assert_eq!(WRITES.load(Ordering::SeqCst), 1);
 }
 
+#[cfg(bench)]
 struct Empty;
 
+#[cfg(bench)]
 impl Read for Empty {
     fn read(&mut self, _buf: &mut [u8]) -> io::Result<usize> {
         Ok(0)
     }
 }
 
+#[cfg(bench)]
 impl Write for Empty {
     fn write(&mut self, _data: &[u8]) -> io::Result<usize> {
         panic!("Empty doesn't support writing")
@@ -493,14 +496,17 @@ fn bench_buffered_reader(b: &mut test::bench::Bencher) {
     b.iter(|| BufDuplexer::new(JustWriter(Empty)));
 }
 
+#[cfg(bench)]
 struct Sink;
 
+#[cfg(bench)]
 impl Read for Sink {
     fn read(&mut self, _buf: &mut [u8]) -> io::Result<usize> {
         panic!("Sink doesn't support reading")
     }
 }
 
+#[cfg(bench)]
 impl Write for Sink {
     fn write(&mut self, data: &[u8]) -> io::Result<usize> {
         Ok(data.len())
