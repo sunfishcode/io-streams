@@ -321,3 +321,11 @@ fn test_socketed_thread_auto_write_first() -> anyhow::Result<()> {
 
     Ok(())
 }
+
+#[test]
+fn test_stdio() {
+    // Test that we can at least construct the stdio streams.
+    let _ = StreamReader::stdin();
+    let _ = StreamWriter::stdout();
+    let _ = StreamWriter::stderr();
+}
